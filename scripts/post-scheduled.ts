@@ -59,7 +59,19 @@ function hasValue(name: string): boolean {
   const value = process.env[name]
   if (!value) return false
   const normalized = value.trim().toLowerCase()
-  return normalized !== '' && !normalized.includes('your-') && normalized !== 'changeme'
+  const placeholders = [
+    'your-',
+    'your_',
+    'yourreal',
+    'your_real',
+    'paste_',
+    'replace_',
+    'changeme',
+    'placeholder',
+    'example_',
+    'dummy_',
+  ]
+  return normalized !== '' && !placeholders.some((token) => normalized.includes(token))
 }
 
 function secretCandidates(name: string): string[] {
