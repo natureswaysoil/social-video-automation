@@ -1,0 +1,100 @@
+name: Scheduled Social Video Posting
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub Actions uses UTC.
+    # Approx ET posting slots: 7:00 AM, 8:15 AM, 11:30 AM, 1:00 PM, 6:15 PM
+    - cron: '0 11 * * *'
+    - cron: '15 12 * * *'
+    - cron: '30 15 * * *'
+    - cron: '0 17 * * *'
+    - cron: '15 22 * * *'
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      USE_SECRET_MANAGER: 'true'
+      DEFAULT_GOOGLE_CLOUD_PROJECT: natureswaysoil-video
+      GOOGLE_CLOUD_PROJECT: natureswaysoil-video
+      SEED_PRODUCT_LIMIT: '5'
+      VARIATIONS_PER_PRODUCT: '5'
+      ENABLE_PLATFORMS: youtube,instagram
+      YT_PRIVACY_STATUS: public
+      DRY_RUN_LOG_ONLY: 'false'
+      ROTATION_STATE_FILE: data/rotation-state.json
+      HEYGEN_POLL_TIMEOUT_MS: '1500000'
+      HEYGEN_POLL_INTERVAL_MS: '15000'
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Restore rotation state
+        uses: actions/cache/restore@v4
+        with:
+          path: data/rotation-state.json
+          key: rotation-state-${{ github.run_id }}
+          restore-keys: |
+            rotation-state-
+
+      - name: Prepare Google ADC credentials
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CLOUD_PROJECT_SECRET: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        run: |
+          set -euo pipefail
+          CREDS_JSON="${GOOGLE_CREDENTIALS:-}"
+          if [ -z "$CREDS_JSON" ]; then
+            CREDS_JSON="${GOOGLE_SERVICE_ACCOUNT_JSON:-}"
+          fi
+          if [ -z "$CREDS_JSON" ]; then
+            echo "::error::Missing GitHub repo secret GOOGLE_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_JSON."
+            exit 1
+          fi
+          CREDS_PATH="$RUNNER_TEMP/gcp-service-account.json"
+          printf '%s' "$CREDS_JSON" > "$CREDS_PATH"
+          chmod 600 "$CREDS_PATH"
+          PROJECT_FROM_JSON="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("project_id", ""))' "$CREDS_PATH" || true)"
+          EFFECTIVE_PROJECT="${GOOGLE_CLOUD_PROJECT_SECRET:-$PROJECT_FROM_JSON}"
+          if [ -z "$EFFECTIVE_PROJECT" ]; then
+            EFFECTIVE_PROJECT="$DEFAULT_GOOGLE_CLOUD_PROJECT"
+          fi
+          {
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$CREDS_PATH"
+            echo "GOOGLE_CLOUD_PROJECT=$EFFECTIVE_PROJECT"
+            echo "GCLOUD_PROJECT=$EFFECTIVE_PROJECT"
+            echo "GCP_PROJECT=$EFFECTIVE_PROJECT"
+          } >> "$GITHUB_ENV"
+          echo "Using Google Cloud project: $EFFECTIVE_PROJECT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run scheduled video post
+        run: npm run post:scheduled
+
+      - name: Save rotation state cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/rotation-state.json
+          key: rotation-state-${{ github.run_id }}
+
+      - name: Upload rotation state artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rotation-state
+          path: data/rotation-state.json
+          if-no-files-found: ignore
