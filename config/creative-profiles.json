@@ -1,20 +1,22 @@
 {
   "defaults": {
-    "avatarId": "Daisy-inskirt-20220818",
-    "voiceId": "2d5b0e6cf36f460aa7fc47e3eee4ba54",
-    "avatarScale": 0.48,
-    "avatarOffsetY": 0.16,
+    "avatarId": "Amanda_in_Blue_Shirt_Front",
+    "voiceId": "ybOJaAgPlBdcGBEpCJzA",
+    "avatarScale": 0.46,
+    "avatarOffsetY": 0.18,
     "tone": "plainspoken, helpful, trusted small family farm brand",
     "format": "25-35 second vertical short",
     "cta": "See the full product details at Nature's Way Soil."
   },
   "profiles": {
     "NWS_014": {
+      "avatarId": "Amanda_Maintenance_Front",
+      "voiceId": "6895c76b6f624e65b81e74671358d95b",
       "audience": "dog owners with yellow lawn spots, pet areas, kennels, patios, and turf runs",
       "angle": "soil-first lawn recovery instead of green dye or cover-up",
-      "avatarScale": 0.46,
-      "avatarOffsetY": 0.18,
-      "tone": "friendly pet owner, practical lawn help, clear CTA",
+      "avatarScale": 0.44,
+      "avatarOffsetY": 0.2,
+      "tone": "friendly pet owner, practical lawn help, clear CTA, no overpromising",
       "cta": "For the lawn repair directions, visit Nature's Way Soil.",
       "hooks": [
         "Dog spots are not just a color problem — they are a soil stress problem.",
@@ -29,11 +31,13 @@
       ]
     },
     "NWS_011": {
+      "avatarId": "Amanda_in_Blue_Shirt_Front",
+      "voiceId": "ybOJaAgPlBdcGBEpCJzA",
       "audience": "gardeners and lawn owners dealing with tired soil, nutrient lockout, and weak roots",
       "angle": "humic, fulvic, and kelp support the root zone and nutrient movement",
-      "avatarScale": 0.48,
-      "avatarOffsetY": 0.16,
-      "tone": "soil educator, clear, credible, clear CTA",
+      "avatarScale": 0.46,
+      "avatarOffsetY": 0.18,
+      "tone": "soil educator, clear, credible, clear CTA, no overpromising",
       "cta": "Learn more at Nature's Way Soil.",
       "hooks": [
         "If plants are fed but still look stuck, the issue may be the soil, not the fertilizer.",
@@ -48,11 +52,13 @@
       ]
     },
     "NWS_013": {
+      "avatarId": "Amanda_in_Grey_Shirt_Front",
+      "voiceId": "ybOJaAgPlBdcGBEpCJzA",
       "audience": "raised bed, container, and garden growers who want a concentrated soil amendment",
       "angle": "worm castings, biochar, compost, and duckweed extract for living soil support",
-      "avatarScale": 0.48,
-      "avatarOffsetY": 0.16,
-      "tone": "warm family farm, soil-building focus, clear CTA",
+      "avatarScale": 0.46,
+      "avatarOffsetY": 0.18,
+      "tone": "warm family farm, soil-building focus, clear CTA, no overpromising",
       "cta": "See how to use it at Nature's Way Soil.",
       "hooks": [
         "This is not ordinary bagged dirt — it is a concentrated soil-building blend.",
@@ -67,11 +73,13 @@
       ]
     },
     "NWS_021": {
+      "avatarId": "Albert_public_3",
+      "voiceId": "3o5awrz3sR3uP9rxaD80",
       "audience": "landowners, small farms, horse owners, cattle owners, hay and pasture managers",
       "angle": "liquid pasture and lawn support for stronger-looking grass and better soil support",
-      "avatarScale": 0.44,
-      "avatarOffsetY": 0.2,
-      "tone": "rural, practical, no-nonsense, clear CTA",
+      "avatarScale": 0.42,
+      "avatarOffsetY": 0.22,
+      "tone": "rural, practical, no-nonsense, clear CTA, no overpromising",
       "cta": "For hay and pasture use directions, visit Nature's Way Soil.",
       "hooks": [
         "Pasture grass needs more than a quick green-up — it needs soil support.",
@@ -86,11 +94,13 @@
       ]
     },
     "NWS_018": {
+      "avatarId": "Albert_public_3",
+      "voiceId": "3o5awrz3sR3uP9rxaD80",
       "audience": "homeowners wanting greener turf and better root-zone support",
       "angle": "seaweed extract plus humic acid for turf and soil support",
-      "avatarScale": 0.46,
-      "avatarOffsetY": 0.18,
-      "tone": "clean lawn-care educator, premium but simple, clear CTA",
+      "avatarScale": 0.44,
+      "avatarOffsetY": 0.2,
+      "tone": "clean lawn-care educator, premium but simple, clear CTA, no overpromising",
       "cta": "See the lawn treatment details at Nature's Way Soil.",
       "hooks": [
         "Greener turf starts with the root zone, not just the leaf blade.",
