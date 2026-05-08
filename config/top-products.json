@@ -1,0 +1,49 @@
+{
+  "topProducts": [
+    {
+      "id": "NWS_014",
+      "name": "Dog Urine Neutralizer & Lawn Revitalizer",
+      "description": "Helps support lawn and soil recovery where dog urine has stressed the grass. Soil-first lawn care, not a temporary green dye.",
+      "category": "dog urine lawn repair",
+      "websiteUrl": "https://www.natureswaysoil.com/lawn-repair",
+      "keywords": ["dog urine", "yellow spots", "lawn repair", "pet safe"],
+      "brollQueries": ["dog walking on green lawn", "yellow grass patches lawn", "garden hose watering lawn", "lush green backyard lawn"]
+    },
+    {
+      "id": "NWS_011",
+      "name": "Liquid Humic & Fulvic Acid with Kelp",
+      "description": "Liquid soil booster blending humic acid, fulvic acid, and kelp for stronger roots and better nutrient uptake support.",
+      "category": "humic fulvic kelp soil booster",
+      "websiteUrl": "https://www.natureswaysoil.com/soil-boost",
+      "keywords": ["humic acid", "fulvic acid", "kelp", "soil health"],
+      "brollQueries": ["rich soil close up", "plant roots in soil", "kelp seaweed ocean", "vegetable garden growing"]
+    },
+    {
+      "id": "NWS_013",
+      "name": "Enhanced Living Compost with Worm Castings & Biochar",
+      "description": "Concentrated living compost with worm castings, biochar, and fermented duckweed extract for soil improvement support.",
+      "category": "living compost worm castings biochar",
+      "websiteUrl": "https://www.natureswaysoil.com/living-compost",
+      "keywords": ["compost", "worm castings", "biochar", "duckweed"],
+      "brollQueries": ["rich compost soil close up", "worm castings compost", "raised bed vegetable garden", "hands holding healthy soil"]
+    },
+    {
+      "id": "NWS_021",
+      "name": "Hay, Pasture & Lawn Fertilizer",
+      "description": "Liquid fertilizer for hay, pasture, and lawn areas where landowners want stronger-looking grass and better soil support.",
+      "category": "hay pasture lawn fertilizer",
+      "websiteUrl": "https://www.natureswaysoil.com/pasture-boost",
+      "keywords": ["hay", "pasture", "lawn fertilizer", "grass growth"],
+      "brollQueries": ["green pasture grass field", "hay bales farm field", "cattle grazing pasture", "lush grass close up"]
+    },
+    {
+      "id": "NWS_018",
+      "name": "Seaweed & Humic Acid Lawn Treatment",
+      "description": "Liquid lawn treatment combining seaweed extract and humic acid for greener turf and healthier root-zone support.",
+      "category": "seaweed humic lawn treatment",
+      "websiteUrl": "https://www.natureswaysoil.com/soil-boost",
+      "keywords": ["seaweed", "humic acid", "lawn", "root zone"],
+      "brollQueries": ["lush green lawn close up", "seaweed kelp ocean", "watering green grass", "healthy lawn sunset"]
+    }
+  ]
+}
