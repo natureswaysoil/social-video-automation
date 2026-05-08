@@ -6,7 +6,8 @@
   "description": "Nature's Way Soil scheduled product video generation and social posting automation.",
   "scripts": {
     "post:scheduled": "ts-node scripts/post-scheduled.ts",
-    "test:dry": "DRY_RUN_LOG_ONLY=true ts-node scripts/post-scheduled.ts"
+    "test:dry": "DRY_RUN_LOG_ONLY=true ts-node scripts/post-scheduled.ts",
+    "test:creative": "ts-node scripts/test-creative-video.ts"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^6.1.1",
