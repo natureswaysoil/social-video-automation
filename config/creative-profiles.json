@@ -6,7 +6,7 @@
     "avatarOffsetY": 0.16,
     "tone": "plainspoken, helpful, trusted small farm brand",
     "format": "25-35 second vertical short",
-    "cta": "Shop direct at Nature's Way Soil."
+    "cta": ""
   },
   "profiles": {
     "NWS_014": {
@@ -14,33 +14,17 @@
       "angle": "soil-first lawn recovery instead of green dye or cover-up",
       "avatarScale": 0.46,
       "avatarOffsetY": 0.18,
-      "tone": "friendly pet owner, practical lawn help",
+      "tone": "friendly pet owner, practical lawn help, no sales pitch",
       "hooks": [
         "Dog spots are not just a color problem — they are a soil stress problem.",
         "If your lawn keeps getting yellow dog spots, the soil needs support, not a quick cover-up.",
         "For pet lawns, the best fix starts below the grass blade."
       ],
       "scenes": [
-        {
-          "name": "problem",
-          "seconds": 7,
-          "brollQueries": ["dog walking on green lawn", "yellow grass patches lawn", "dog backyard lawn"]
-        },
-        {
-          "name": "soil cause",
-          "seconds": 8,
-          "brollQueries": ["close up grass roots soil", "dry yellow grass close up", "healthy soil close up"]
-        },
-        {
-          "name": "apply",
-          "seconds": 8,
-          "brollQueries": ["garden hose watering lawn", "spraying lawn with hose", "watering backyard grass"]
-        },
-        {
-          "name": "result cta",
-          "seconds": 7,
-          "brollQueries": ["lush green backyard lawn", "healthy green grass close up", "dog on green lawn"]
-        }
+        { "name": "problem", "seconds": 7, "brollQueries": ["dog walking on green lawn", "yellow grass patches lawn", "dog backyard lawn"] },
+        { "name": "soil cause", "seconds": 8, "brollQueries": ["close up grass roots soil", "dry yellow grass close up", "healthy soil close up"] },
+        { "name": "apply", "seconds": 8, "brollQueries": ["garden hose watering lawn", "spraying lawn with hose", "watering backyard grass"] },
+        { "name": "healthy lawn", "seconds": 7, "brollQueries": ["lush green backyard lawn", "healthy green grass close up", "dog on green lawn"] }
       ]
     },
     "NWS_011": {
@@ -48,33 +32,17 @@
       "angle": "humic, fulvic, and kelp support the root zone and nutrient movement",
       "avatarScale": 0.48,
       "avatarOffsetY": 0.16,
-      "tone": "soil educator, clear and credible",
+      "tone": "soil educator, clear, credible, no sales pitch",
       "hooks": [
         "If plants are fed but still look stuck, the issue may be the soil, not the fertilizer.",
         "Humic, fulvic, and kelp help support the part of the plant you cannot see — the root zone.",
         "Better plant growth starts with better soil movement."
       ],
       "scenes": [
-        {
-          "name": "problem",
-          "seconds": 7,
-          "brollQueries": ["weak garden plants", "dry garden soil close up", "stressed vegetable garden"]
-        },
-        {
-          "name": "root zone",
-          "seconds": 8,
-          "brollQueries": ["plant roots in soil", "healthy white roots close up", "rich soil close up"]
-        },
-        {
-          "name": "ingredients",
-          "seconds": 8,
-          "brollQueries": ["kelp seaweed ocean", "seaweed kelp close up", "liquid fertilizer pouring"]
-        },
-        {
-          "name": "result cta",
-          "seconds": 7,
-          "brollQueries": ["healthy vegetable garden", "lush garden plants", "green lawn close up"]
-        }
+        { "name": "problem", "seconds": 7, "brollQueries": ["weak garden plants", "dry garden soil close up", "stressed vegetable garden"] },
+        { "name": "root zone", "seconds": 8, "brollQueries": ["plant roots in soil", "healthy white roots close up", "rich soil close up"] },
+        { "name": "ingredients", "seconds": 8, "brollQueries": ["kelp seaweed ocean", "seaweed kelp close up", "liquid fertilizer pouring"] },
+        { "name": "healthy growth", "seconds": 7, "brollQueries": ["healthy vegetable garden", "lush garden plants", "green lawn close up"] }
       ]
     },
     "NWS_013": {
@@ -82,33 +50,17 @@
       "angle": "worm castings, biochar, compost, and duckweed extract for living soil support",
       "avatarScale": 0.48,
       "avatarOffsetY": 0.16,
-      "tone": "warm family farm, soil-building focus",
+      "tone": "warm family farm, soil-building focus, no sales pitch",
       "hooks": [
         "This is not ordinary bagged dirt — it is a concentrated soil-building blend.",
         "Healthy gardens start with living soil, not just more fertilizer.",
         "For raised beds and containers, a little biology can go a long way."
       ],
       "scenes": [
-        {
-          "name": "problem",
-          "seconds": 7,
-          "brollQueries": ["raised bed garden soil", "container garden soil", "dry potting soil close up"]
-        },
-        {
-          "name": "ingredients",
-          "seconds": 8,
-          "brollQueries": ["worm castings compost", "biochar soil close up", "hands holding compost"]
-        },
-        {
-          "name": "use",
-          "seconds": 8,
-          "brollQueries": ["mixing compost into raised bed", "gardener adding soil to plants", "planting vegetable starts"]
-        },
-        {
-          "name": "result cta",
-          "seconds": 7,
-          "brollQueries": ["healthy raised bed vegetables", "lush vegetable garden", "hands holding healthy soil"]
-        }
+        { "name": "problem", "seconds": 7, "brollQueries": ["raised bed garden soil", "container garden soil", "dry potting soil close up"] },
+        { "name": "ingredients", "seconds": 8, "brollQueries": ["worm castings compost", "biochar soil close up", "hands holding compost"] },
+        { "name": "use", "seconds": 8, "brollQueries": ["mixing compost into raised bed", "gardener adding soil to plants", "planting vegetable starts"] },
+        { "name": "living soil", "seconds": 7, "brollQueries": ["healthy raised bed vegetables", "lush vegetable garden", "hands holding healthy soil"] }
       ]
     },
     "NWS_021": {
@@ -116,33 +68,17 @@
       "angle": "liquid pasture and lawn support for stronger-looking grass and better soil support",
       "avatarScale": 0.44,
       "avatarOffsetY": 0.2,
-      "tone": "rural, practical, no-nonsense",
+      "tone": "rural, practical, no-nonsense, no sales pitch",
       "hooks": [
         "Pasture grass needs more than a quick green-up — it needs soil support.",
         "If your hay field or pasture looks tired, start with the soil under the stand.",
         "For hay, pasture, and lawn, stronger grass starts in the root zone."
       ],
       "scenes": [
-        {
-          "name": "field problem",
-          "seconds": 7,
-          "brollQueries": ["dry pasture grass field", "thin pasture grass", "farm pasture field"]
-        },
-        {
-          "name": "use case",
-          "seconds": 8,
-          "brollQueries": ["green pasture grass field", "hay bales farm field", "cattle grazing pasture"]
-        },
-        {
-          "name": "application",
-          "seconds": 8,
-          "brollQueries": ["spraying pasture field", "tractor spraying field", "farm field grass close up"]
-        },
-        {
-          "name": "result cta",
-          "seconds": 7,
-          "brollQueries": ["lush pasture grass", "green hay field", "horse grazing pasture"]
-        }
+        { "name": "field problem", "seconds": 7, "brollQueries": ["dry pasture grass field", "thin pasture grass", "farm pasture field"] },
+        { "name": "use case", "seconds": 8, "brollQueries": ["green pasture grass field", "hay bales farm field", "cattle grazing pasture"] },
+        { "name": "application", "seconds": 8, "brollQueries": ["spraying pasture field", "tractor spraying field", "farm field grass close up"] },
+        { "name": "healthy pasture", "seconds": 7, "brollQueries": ["lush pasture grass", "green hay field", "horse grazing pasture"] }
       ]
     },
     "NWS_018": {
@@ -150,33 +86,17 @@
       "angle": "seaweed extract plus humic acid for turf and soil support",
       "avatarScale": 0.46,
       "avatarOffsetY": 0.18,
-      "tone": "clean lawn-care educator, premium but simple",
+      "tone": "clean lawn-care educator, premium but simple, no sales pitch",
       "hooks": [
         "Greener turf starts with the root zone, not just the leaf blade.",
         "Seaweed and humic acid are a simple way to support tired lawn soil.",
         "If your lawn looks hungry, the soil may need help moving nutrients."
       ],
       "scenes": [
-        {
-          "name": "lawn problem",
-          "seconds": 7,
-          "brollQueries": ["patchy lawn close up", "dry lawn grass close up", "home lawn problem"]
-        },
-        {
-          "name": "ingredients",
-          "seconds": 8,
-          "brollQueries": ["seaweed kelp ocean", "kelp seaweed close up", "humic acid soil close up"]
-        },
-        {
-          "name": "application",
-          "seconds": 8,
-          "brollQueries": ["watering green lawn", "spraying lawn with hose", "lawn care application"]
-        },
-        {
-          "name": "result cta",
-          "seconds": 7,
-          "brollQueries": ["lush green lawn close up", "healthy lawn sunset", "green grass roots close up"]
-        }
+        { "name": "lawn problem", "seconds": 7, "brollQueries": ["patchy lawn close up", "dry lawn grass close up", "home lawn problem"] },
+        { "name": "ingredients", "seconds": 8, "brollQueries": ["seaweed kelp ocean", "kelp seaweed close up", "humic acid soil close up"] },
+        { "name": "application", "seconds": 8, "brollQueries": ["watering green lawn", "spraying lawn with hose", "lawn care application"] },
+        { "name": "healthy turf", "seconds": 7, "brollQueries": ["lush green lawn close up", "healthy lawn sunset", "green grass roots close up"] }
       ]
     }
   }
