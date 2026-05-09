@@ -17,9 +17,17 @@ jobs:
     timeout-minutes: 60
 
     env:
+      # Opt JavaScript actions into the GitHub Node 24 runtime now so the
+      # scheduled workflow does not keep warning about Node 20 action runtime deprecation.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+      # Default mode: load app/API secrets from Google Secret Manager.
+      # If no Google service-account secret is configured, the workflow falls
+      # back to direct GitHub repo secrets and sets USE_SECRET_MANAGER=false.
       USE_SECRET_MANAGER: 'true'
       DEFAULT_GOOGLE_CLOUD_PROJECT: natureswaysoil-video
       GOOGLE_CLOUD_PROJECT: natureswaysoil-video
+
       SEED_PRODUCT_LIMIT: '5'
       VARIATIONS_PER_PRODUCT: '5'
       ENABLE_PLATFORMS: youtube,instagram
@@ -28,6 +36,25 @@ jobs:
       ROTATION_STATE_FILE: data/rotation-state.json
       HEYGEN_POLL_TIMEOUT_MS: '1500000'
       HEYGEN_POLL_INTERVAL_MS: '15000'
+
+      # Optional direct GitHub repo secrets fallback. These stay masked by GitHub.
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
+      HEYGEN_API_ENDPOINT: ${{ secrets.HEYGEN_API_ENDPOINT }}
+      HEYGEN_DEFAULT_AVATAR: ${{ secrets.HEYGEN_DEFAULT_AVATAR }}
+      HEYGEN_DEFAULT_VOICE: ${{ secrets.HEYGEN_DEFAULT_VOICE }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+      INSTAGRAM_IG_ID: ${{ secrets.INSTAGRAM_IG_ID }}
+      INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+      INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
 
     steps:
       - name: Checkout repo
@@ -52,10 +79,13 @@ jobs:
           if [ -z "$CREDS_JSON" ]; then
             CREDS_JSON="${GOOGLE_SERVICE_ACCOUNT_JSON:-}"
           fi
+
           if [ -z "$CREDS_JSON" ]; then
-            echo "::error::Missing GitHub repo secret GOOGLE_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_JSON."
-            exit 1
+            echo "::warning::No GOOGLE_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_JSON repo secret found. Falling back to direct GitHub repo secrets."
+            echo "USE_SECRET_MANAGER=false" >> "$GITHUB_ENV"
+            exit 0
           fi
+
           CREDS_PATH="$RUNNER_TEMP/gcp-service-account.json"
           printf '%s' "$CREDS_JSON" > "$CREDS_PATH"
           chmod 600 "$CREDS_PATH"
@@ -69,13 +99,30 @@ jobs:
             echo "GOOGLE_CLOUD_PROJECT=$EFFECTIVE_PROJECT"
             echo "GCLOUD_PROJECT=$EFFECTIVE_PROJECT"
             echo "GCP_PROJECT=$EFFECTIVE_PROJECT"
+            echo "USE_SECRET_MANAGER=true"
           } >> "$GITHUB_ENV"
           echo "Using Google Cloud project: $EFFECTIVE_PROJECT"
+
+      - name: Validate direct GitHub secrets fallback
+        if: env.USE_SECRET_MANAGER == 'false'
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in OPENAI_API_KEY HEYGEN_API_KEY PEXELS_API_KEY; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::No Google service-account secret was found, and these required direct GitHub repo secrets are missing: ${missing[*]}. Add GOOGLE_SERVICE_ACCOUNT_JSON/GOOGLE_CREDENTIALS, or add the direct API secrets."
+            exit 1
+          fi
+          echo "Using direct GitHub repo secrets fallback."
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
