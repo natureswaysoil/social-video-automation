@@ -166,30 +166,74 @@ function pickProduct(products: Product[]) {
 
 async function generateScript(product: Product, variationIndex: number, variationCount: number): Promise<string> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  const prompt = `Create a 25-35 second vertical product video voiceover for Nature's Way Soil.
+  const angles = [
+    'quick win for busy homeowners',
+    'fix a frustrating recurring lawn issue',
+    'pet-owner friendly yard recovery focus',
+    'seasonal lawn prep and prevention',
+    'save time versus trial-and-error methods',
+    'beginner-friendly, simple next-step guidance',
+  ]
+  const angle = angles[variationIndex % angles.length]
 
-Product: ${product.name}
-Description: ${product.description}
-Category: ${product.category}
-Website: ${product.websiteUrl}
-Variation: ${variationIndex + 1} of ${variationCount}; use a fresh opening hook.
+  const prompt = `You are writing a high-converting short-form product sales voiceover for Nature's Way Soil.
 
-Rules:
-- Keep it honest and compliant.
-- Do not guarantee results.
-- Do not claim pesticide, disease cure, or instant fix.
-- Sound natural, direct, and helpful.
-- End with a direct website call to action.
-- Return only the spoken voiceover text.`
+Product context:
+- Product: ${product.name}
+- Description: ${product.description}
+- Category: ${product.category}
+- Website: ${product.websiteUrl}
+- Variation: ${variationIndex + 1} of ${variationCount}
+- Sales angle: ${angle}
+
+Goal:
+- Drive qualified clicks and purchases while staying truthful and compliant.
+
+Required structure (speak naturally, no section labels):
+- 0-3s: Pattern-interrupt hook tied to a painful problem.
+- 3-10s: Call out who this is for and why common fixes fail.
+- 10-22s: Explain how this product helps in practical, plain language.
+- 22-30s: Add credibility signal (experience, consistency, routine, or practical proof-style language without fabricating stats/testimonials).
+- 30-35s: Clear action CTA to visit the website now.
+
+Hard rules:
+- 25-35 seconds spoken length.
+- No guarantees, no disease/pesticide cure claims, no instant-fix claims.
+- No hype words like "miracle", "magic", or "secret formula".
+- No hashtags, emojis, bullets, or stage directions.
+- Keep it specific, concrete, and easy to understand.
+- Return only the final spoken voiceover text.`
 
   const response = await client.chat.completions.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-    max_tokens: 220,
+    temperature: 0.65,
+    max_tokens: 260,
   })
 
-  return response.choices[0]?.message?.content?.trim() || product.description
+  const draft = response.choices[0]?.message?.content?.trim() || ''
+  if (!draft) return product.description
+
+  const polishPrompt = `Polish this voiceover for clarity and conversion while keeping it compliant.
+
+Requirements:
+- Keep meaning and compliance intact.
+- Keep 25-35 second spoken length.
+- Improve hook strength, specificity, and CTA clarity.
+- Remove fluff and repetition.
+- Output only the revised spoken voiceover.
+
+Draft:
+${draft}`
+
+  const polishedResponse = await client.chat.completions.create({
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    messages: [{ role: 'user', content: polishPrompt }],
+    temperature: 0.35,
+    max_tokens: 260,
+  })
+
+  return polishedResponse.choices[0]?.message?.content?.trim() || draft || product.description
 }
 
 async function findPexelsVideo(product: Product): Promise<string> {
@@ -409,7 +453,10 @@ async function main() {
   log('Scheduled product selected', { product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
 
   const script = await generateScript(product, variationIndex, variationCount)
-  log('Generated script', { length: script.length })
+  log('Generated script', {
+    length: script.length,
+    preview: script.replace(/\s+/g, ' ').trim().slice(0, 240),
+  })
 
   const brollUrl = await findPexelsVideo(product)
   const videoId = await createHeyGenVideo(product, script, brollUrl)
