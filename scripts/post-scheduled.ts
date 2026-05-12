@@ -111,6 +111,18 @@ async function loadSecrets() {
   }
 }
 
+function assertRequiredSecrets() {
+  const required = ['OPENAI_API_KEY', 'HEYGEN_API_KEY', 'PEXELS_API_KEY']
+  const missing = required.filter((name) => !hasValue(name))
+  if (missing.length === 0) return
+
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'unknown'
+  throw new Error(
+    `Missing required secrets after secret loading: ${missing.join(', ')}. ` +
+    `Verify these secrets exist and are accessible in Google Secret Manager for project ${projectId}.`,
+  )
+}
+
 function loadProducts(): Product[] {
   const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
   const products = Array.isArray(raw.topProducts) ? raw.topProducts : []
@@ -364,6 +376,7 @@ async function postToInstagram(videoUrl: string, captionText: string): Promise<s
 
 async function main() {
   await loadSecrets()
+  assertRequiredSecrets()
 
   const products = loadProducts()
   if (!products.length) throw new Error('No products configured')

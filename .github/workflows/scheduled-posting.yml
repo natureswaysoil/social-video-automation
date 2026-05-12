@@ -132,6 +132,30 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Using Google Cloud project: $EFFECTIVE_PROJECT"
 
+      - name: Log auth context
+        run: |
+          set -euo pipefail
+          mode="direct-github-secrets"
+          if [ "${USE_SECRET_MANAGER:-false}" = "true" ]; then
+            if [ -n "${GOOGLE_GHA_CREDS_PATH:-}" ]; then
+              mode="google-oidc"
+            elif [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
+              mode="google-service-account-json"
+            else
+              mode="google-adc"
+            fi
+          fi
+
+          echo "Auth mode: $mode"
+          echo "Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
+          {
+            echo "### Scheduled Posting Auth Context"
+            echo
+            echo "- Auth mode: $mode"
+            echo "- Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
+            echo "- Secret Manager enabled: ${USE_SECRET_MANAGER:-false}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Validate direct GitHub secrets fallback
         if: env.USE_SECRET_MANAGER == 'false'
         run: |
