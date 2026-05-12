@@ -166,6 +166,10 @@ function pickProduct(products: Product[]) {
 
 async function generateScript(product: Product, variationIndex: number, variationCount: number): Promise<string> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const minWords = Number(process.env.SCRIPT_MIN_WORDS || 55)
+  const maxWords = Number(process.env.SCRIPT_MAX_WORDS || 80)
+  const countWords = (text: string): number =>
+    (text || '').trim().split(/\s+/).filter(Boolean).length
   const angles = [
     'quick win for busy homeowners',
     'fix a frustrating recurring lawn issue',
@@ -198,6 +202,7 @@ Required structure (speak naturally, no section labels):
 
 Hard rules:
 - 25-35 seconds spoken length.
+- Target ${minWords}-${maxWords} words.
 - No guarantees, no disease/pesticide cure claims, no instant-fix claims.
 - No hype words like "miracle", "magic", or "secret formula".
 - No hashtags, emojis, bullets, or stage directions.
@@ -219,6 +224,7 @@ Hard rules:
 Requirements:
 - Keep meaning and compliance intact.
 - Keep 25-35 second spoken length.
+- Keep the final script between ${minWords} and ${maxWords} words.
 - Improve hook strength, specificity, and CTA clarity.
 - Remove fluff and repetition.
 - Output only the revised spoken voiceover.
@@ -232,8 +238,30 @@ ${draft}`
     temperature: 0.35,
     max_tokens: 260,
   })
+  const polished = polishedResponse.choices[0]?.message?.content?.trim() || draft
+  const polishedWordCount = countWords(polished)
+  if (polishedWordCount >= minWords && polishedWordCount <= maxWords) return polished || product.description
 
-  return polishedResponse.choices[0]?.message?.content?.trim() || draft || product.description
+  const compressPrompt = `Rewrite the voiceover to ${minWords}-${maxWords} words while preserving the same offer, compliance, and CTA.
+
+Rules:
+- Stay natural and conversational.
+- Keep one clear hook, one clear mechanism, one clear CTA.
+- No exaggerated or prohibited claims.
+- Output only the final voiceover text.
+
+Voiceover:
+${polished}`
+
+  const compressedResponse = await client.chat.completions.create({
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    messages: [{ role: 'user', content: compressPrompt }],
+    temperature: 0.25,
+    max_tokens: 220,
+  })
+
+  const compressed = compressedResponse.choices[0]?.message?.content?.trim() || polished
+  return compressed || draft || product.description
 }
 
 async function findPexelsVideo(product: Product): Promise<string> {
@@ -453,8 +481,10 @@ async function main() {
   log('Scheduled product selected', { product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
 
   const script = await generateScript(product, variationIndex, variationCount)
+  const scriptWordCount = script.trim().split(/\s+/).filter(Boolean).length
   log('Generated script', {
     length: script.length,
+    words: scriptWordCount,
     preview: script.replace(/\s+/g, ' ').trim().slice(0, 240),
   })
 
