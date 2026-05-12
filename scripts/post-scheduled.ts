@@ -311,6 +311,53 @@ async function findPexelsVideo(product: Product): Promise<string> {
   return url
 }
 
+function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
+  const text = (script || '').trim()
+  if (!text) return ['']
+
+  const normalizedSceneCount = Math.max(1, sceneCount)
+  if (normalizedSceneCount === 1) return [text]
+
+  const sentences = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  if (sentences.length <= 1) return [text]
+
+  const chunks: string[] = Array.from({ length: normalizedSceneCount }, () => '')
+  const wordsByChunk: number[] = Array.from({ length: normalizedSceneCount }, () => 0)
+
+  for (const sentence of sentences) {
+    const words = sentence.split(/\s+/).filter(Boolean).length
+    let targetIndex = 0
+    for (let i = 1; i < wordsByChunk.length; i++) {
+      if (wordsByChunk[i] < wordsByChunk[targetIndex]) targetIndex = i
+    }
+
+    chunks[targetIndex] = chunks[targetIndex] ? `${chunks[targetIndex]} ${sentence}` : sentence
+    wordsByChunk[targetIndex] += words
+  }
+
+  const nonEmpty = chunks.map((s) => s.trim()).filter(Boolean)
+  return nonEmpty.length ? nonEmpty : [text]
+}
+
+async function findPexelsVideos(product: Product, sceneCount: number): Promise<string[]> {
+  const queries = product.brollQueries?.length ? product.brollQueries : [product.category, product.name]
+  const count = Math.max(1, sceneCount)
+  const urls: string[] = []
+
+  for (let i = 0; i < count; i++) {
+    const rotated = [...queries.slice(i), ...queries.slice(0, i)]
+    const tempProduct: Product = { ...product, brollQueries: rotated }
+    const url = await findPexelsVideo(tempProduct)
+    if (url) urls.push(url)
+  }
+
+  return urls
+}
+
 function avatarSettings(product: Product) {
   const hay = /hay|pasture|forage|cattle|field/i.test(`${product.name} ${product.category}`)
   const dog = /dog|urine|yellow|pet/i.test(`${product.name} ${product.category}`)
@@ -324,35 +371,41 @@ function avatarSettings(product: Product) {
   }
 }
 
-async function createHeyGenVideo(product: Product, script: string, brollUrl: string): Promise<string> {
+async function createHeyGenVideo(product: Product, script: string, brollUrls: string[]): Promise<string> {
   const apiKey = process.env.HEYGEN_API_KEY
   if (!apiKey) throw new Error('Missing HEYGEN_API_KEY')
   const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
   const avatar = avatarSettings(product)
 
-  const background = brollUrl
-    ? { type: 'video', url: brollUrl, play_style: 'fit_to_scene' }
-    : { type: 'color', value: '#0a3d0a' }
+  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 3))
+  const scriptScenes = splitScriptIntoScenes(script, sceneCount)
+  const sceneBackgrounds = scriptScenes.map((_, index) => brollUrls[index] || brollUrls[0] || '')
+
+  const videoInputs = scriptScenes.map((sceneScript, index) => {
+    const background = sceneBackgrounds[index]
+      ? { type: 'video', url: sceneBackgrounds[index], play_style: 'fit_to_scene' }
+      : { type: 'color', value: '#0a3d0a' }
+
+    return {
+      character: {
+        type: 'avatar',
+        avatar_id: avatar.avatar_id,
+        avatar_style: 'normal',
+        scale: avatar.scale,
+        offset: { x: 0, y: avatar.offsetY },
+      },
+      voice: {
+        type: 'text',
+        input_text: sceneScript,
+        voice_id: avatar.voice_id,
+        speed: 1.0,
+      },
+      background,
+    }
+  })
 
   const body = {
-    video_inputs: [
-      {
-        character: {
-          type: 'avatar',
-          avatar_id: avatar.avatar_id,
-          avatar_style: 'normal',
-          scale: avatar.scale,
-          offset: { x: 0, y: avatar.offsetY },
-        },
-        voice: {
-          type: 'text',
-          input_text: script,
-          voice_id: avatar.voice_id,
-          speed: 1.0,
-        },
-        background,
-      },
-    ],
+    video_inputs: videoInputs,
     dimension: { width: 720, height: 1280 },
     title: product.name,
   }
@@ -364,7 +417,7 @@ async function createHeyGenVideo(product: Product, script: string, brollUrl: str
 
   const videoId = response.data?.data?.video_id || response.data?.video_id
   if (!videoId) throw new Error('HeyGen did not return video_id')
-  log('HeyGen video job created', { videoId, avatarScale: avatar.scale })
+  log('HeyGen video job created', { videoId, avatarScale: avatar.scale, scenes: videoInputs.length })
   return videoId
 }
 
@@ -519,8 +572,10 @@ async function main() {
     preview: script.replace(/\s+/g, ' ').trim().slice(0, 240),
   })
 
-  const brollUrl = await findPexelsVideo(product)
-  const videoId = await createHeyGenVideo(product, script, brollUrl)
+  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 3))
+  const brollUrls = await findPexelsVideos(product, sceneCount)
+  log('Selected b-roll scenes', { requestedScenes: sceneCount, selected: brollUrls.length })
+  const videoId = await createHeyGenVideo(product, script, brollUrls)
   const videoUrl = await pollHeyGen(videoId)
   log('Finished video URL', { videoUrl })
 

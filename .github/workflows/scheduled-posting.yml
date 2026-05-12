@@ -39,6 +39,7 @@ jobs:
       ROTATION_STATE_FILE: data/rotation-state.json
       HEYGEN_POLL_TIMEOUT_MS: '1500000'
       HEYGEN_POLL_INTERVAL_MS: '15000'
+      HEYGEN_SCENE_COUNT: '3'
       RUN_POSTING: 'true'
 
       # Optional direct GitHub repo secrets fallback. These stay masked by GitHub.
