@@ -204,18 +204,42 @@ async function findPexelsVideo(product: Product): Promise<string> {
   })
   const video = response.data?.videos?.[0]
   const files = video?.video_files || []
-  const portrait = files.find((file: any) => Number(file.height || 0) > Number(file.width || 0))
-  const sd = files.find((file: any) => file.quality === 'sd')
-  const url = portrait?.link || sd?.link || files[0]?.link || ''
-  log('Selected Pexels b-roll', { query, videoId: video?.id, url: url ? 'selected' : 'none' })
+
+  const qualityScore = (quality: string): number => {
+    const q = String(quality || '').toLowerCase()
+    if (q.includes('uhd') || q.includes('4k')) return 4
+    if (q.includes('hd') || q.includes('full')) return 3
+    if (q.includes('sd')) return 1
+    return 2
+  }
+
+  const area = (file: any): number => Number(file.width || 0) * Number(file.height || 0)
+  const portraitFiles = files.filter((file: any) => Number(file.height || 0) > Number(file.width || 0))
+  const candidates = portraitFiles.length ? portraitFiles : files
+
+  const best = [...candidates].sort((a: any, b: any) => {
+    const scoreA = qualityScore(a.quality) * 100000000 + area(a)
+    const scoreB = qualityScore(b.quality) * 100000000 + area(b)
+    return scoreB - scoreA
+  })[0]
+
+  const url = best?.link || ''
+  log('Selected Pexels b-roll', {
+    query,
+    videoId: video?.id,
+    quality: best?.quality || 'unknown',
+    width: best?.width || 0,
+    height: best?.height || 0,
+    url: url ? 'selected' : 'none',
+  })
   return url
 }
 
 function avatarSettings(product: Product) {
   const hay = /hay|pasture|forage|cattle|field/i.test(`${product.name} ${product.category}`)
   const dog = /dog|urine|yellow|pet/i.test(`${product.name} ${product.category}`)
-  const scale = Number(process.env.HEYGEN_AVATAR_SCALE || (hay ? 0.52 : dog ? 0.55 : 0.58))
-  const offsetY = Number(process.env.HEYGEN_AVATAR_OFFSET_Y || (hay ? 0.12 : 0.08))
+  const scale = Number(process.env.HEYGEN_AVATAR_SCALE || (hay ? 0.44 : dog ? 0.47 : 0.5))
+  const offsetY = Number(process.env.HEYGEN_AVATAR_OFFSET_Y || (hay ? 0.14 : 0.1))
   return {
     avatar_id: process.env.HEYGEN_DEFAULT_AVATAR || 'Daisy-inskirt-20220818',
     voice_id: process.env.HEYGEN_DEFAULT_VOICE || '2d5b0e6cf36f460aa7fc47e3eee4ba54',
