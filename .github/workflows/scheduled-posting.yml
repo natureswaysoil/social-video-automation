@@ -80,6 +80,7 @@ jobs:
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ env.DEFAULT_GOOGLE_CLOUD_PROJECT }}
           create_credentials_file: true
           export_environment_variables: true
 
@@ -94,7 +95,12 @@ jobs:
           # If OIDC auth already provided ADC, keep it and skip JSON-key setup.
           if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
             echo "OIDC authentication already configured GOOGLE_APPLICATION_CREDENTIALS."
-            echo "USE_SECRET_MANAGER=true" >> "$GITHUB_ENV"
+            {
+              echo "GOOGLE_CLOUD_PROJECT=$DEFAULT_GOOGLE_CLOUD_PROJECT"
+              echo "GCLOUD_PROJECT=$DEFAULT_GOOGLE_CLOUD_PROJECT"
+              echo "GCP_PROJECT=$DEFAULT_GOOGLE_CLOUD_PROJECT"
+              echo "USE_SECRET_MANAGER=true"
+            } >> "$GITHUB_ENV"
             exit 0
           fi
 
