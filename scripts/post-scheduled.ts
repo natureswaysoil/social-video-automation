@@ -48,6 +48,10 @@ const SECRET_NAMES = [
   'INSTAGRAM_IG_ID',
   'INSTAGRAM_USER_ID',
   'INSTAGRAM_ACCOUNT_ID',
+  'FB_PAGE_ACCESS_TOKEN',
+  'FB_PAGE_ID',
+  'FACEBOOK_PAGE_ACCESS_TOKEN',
+  'FACEBOOK_PAGE_ID',
 ]
 
 function log(message: string, data?: any) {
@@ -470,6 +474,33 @@ async function postToInstagram(videoUrl: string, captionText: string): Promise<s
   return mediaId
 }
 
+async function postToFacebook(videoUrl: string, title: string, captionText: string): Promise<string> {
+  const pageAccessToken = pickEnv(['FB_PAGE_ACCESS_TOKEN', 'FACEBOOK_PAGE_ACCESS_TOKEN'])
+  const pageId = pickEnv(['FB_PAGE_ID', 'FACEBOOK_PAGE_ID'])
+  if (!pageAccessToken || !pageId) throw new Error('Missing Facebook Page access token or Page ID')
+
+  const apiVersion = process.env.FACEBOOK_API_VERSION || 'v20.0'
+  const host = process.env.FACEBOOK_API_HOST || 'graph.facebook.com'
+  const baseUrl = `https://${host}/${apiVersion}`
+
+  const body = new URLSearchParams({
+    access_token: pageAccessToken,
+    file_url: videoUrl,
+    title: title.slice(0, 95),
+    description: captionText,
+    published: 'true',
+  })
+
+  const response = await axios.post(`${baseUrl}/${pageId}/videos`, body.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 180000,
+  })
+
+  const postId = response.data?.id || ''
+  if (!postId) throw new Error('Facebook video publish did not return id')
+  return postId
+}
+
 async function main() {
   await loadSecrets()
   assertRequiredSecrets()
@@ -494,7 +525,7 @@ async function main() {
   log('Finished video URL', { videoUrl })
 
   const captionText = caption(product, script)
-  const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram')
+  const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook')
     .toLowerCase()
     .split(',')
     .map((p) => p.trim())
@@ -523,6 +554,16 @@ async function main() {
       log('Posted to Instagram', { id })
     } catch (error: any) {
       log('Instagram post failed', error?.message || error)
+    }
+  }
+
+  if (platforms.includes('facebook')) {
+    try {
+      const id = await postToFacebook(videoUrl, product.name, captionText)
+      posted++
+      log('Posted to Facebook', { id })
+    } catch (error: any) {
+      log('Facebook post failed', error?.message || error)
     }
   }
 

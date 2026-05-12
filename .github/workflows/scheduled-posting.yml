@@ -33,7 +33,7 @@ jobs:
 
       SEED_PRODUCT_LIMIT: '5'
       VARIATIONS_PER_PRODUCT: '5'
-      ENABLE_PLATFORMS: youtube,instagram
+      ENABLE_PLATFORMS: youtube,instagram,facebook
       YT_PRIVACY_STATUS: public
       DRY_RUN_LOG_ONLY: 'false'
       ROTATION_STATE_FILE: data/rotation-state.json
@@ -59,6 +59,10 @@ jobs:
       INSTAGRAM_IG_ID: ${{ secrets.INSTAGRAM_IG_ID }}
       INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
       INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+      FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
