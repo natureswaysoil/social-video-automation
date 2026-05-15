@@ -174,6 +174,12 @@ async function generateScript(product: Product, variationIndex: number, variatio
   const maxWords = Number(process.env.SCRIPT_MAX_WORDS || 68)
   const countWords = (text: string): number =>
     (text || '').trim().split(/\s+/).filter(Boolean).length
+  const scenePlan = [
+    'Scene 1: soil close-up that shows the issue or the starting point.',
+    'Scene 2: watering or gardening action that shows simple use or care.',
+    'Scene 3: plant or lawn growth that shows the result the viewer wants.',
+    'Scene 4: clean final CTA shot with a direct website call to action.',
+  ]
   const angles = [
     'quick win for busy homeowners',
     'fix a frustrating recurring lawn issue',
@@ -205,6 +211,9 @@ Required structure (speak naturally, no section labels):
 - 10-22s: Explain how this product helps in practical, plain language.
 - 22-30s: Add credibility signal (experience, consistency, routine, or practical proof-style language without fabricating stats/testimonials).
 - 30-35s: Clear action CTA to visit the website now.
+
+Scene plan to match while writing:
+${scenePlan.map((line) => `- ${line}`).join('\n')}
 
 Hard rules:
 - 25-35 seconds spoken length.
@@ -363,6 +372,110 @@ function sceneBrollQueries(product: Product): string[] {
   return [...new Set(queries)]
 }
 
+type SceneTheme = {
+  label: string
+  scriptGoal: string
+  queryHints: string[]
+}
+
+function sceneThemes(product: Product): SceneTheme[] {
+  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
+
+  const soilTheme: SceneTheme = {
+    label: 'soil close-up',
+    scriptGoal: 'Show the soil problem and make the viewer feel the pain immediately.',
+    queryHints: [
+      'healthy soil close up',
+      'rich compost soil close up',
+      'soil texture macro',
+      'garden soil being prepared',
+      'hands working in soil',
+    ],
+  }
+
+  const wateringTheme: SceneTheme = {
+    label: 'watering and gardening',
+    scriptGoal: 'Show simple action and care with watering, feeding, or garden maintenance.',
+    queryHints: [
+      'watering vegetable garden',
+      'watering lawn with hose',
+      'garden hose watering grass',
+      'mulching garden bed',
+      'gardening hands soil close up',
+    ],
+  }
+
+  const growthTheme: SceneTheme = {
+    label: 'plant and lawn growth',
+    scriptGoal: 'Show the healthy-looking result or the kind of growth the product supports.',
+    queryHints: [
+      'seedlings in rich soil',
+      'green grass roots close up',
+      'lush backyard lawn close up',
+      'raised bed vegetable garden',
+      'healthy lawn roots close up',
+    ],
+  }
+
+  const ctaTheme: SceneTheme = {
+    label: 'final CTA shot',
+    scriptGoal: 'Close with a direct call to action and a clean product-forward finish.',
+    queryHints: [
+      'product on garden table',
+      'hands holding garden product',
+      'lawn care product close up',
+      'gardener looking at lawn',
+      'healthy garden close up',
+    ],
+  }
+
+  const specific: SceneTheme[] = /dog|urine|pet/.test(name)
+    ? [
+        soilTheme,
+        {
+          ...wateringTheme,
+          queryHints: ['watering lawn with hose', 'garden hose watering grass', 'green grass roots close up', 'healthy lawn soil close up'],
+        },
+        {
+          ...growthTheme,
+          queryHints: ['lush backyard lawn close up', 'healthy lawn roots close up', 'green grass close up', 'lawn after watering'],
+        },
+        ctaTheme,
+      ]
+    : /compost|biochar|worm|living/.test(name)
+      ? [
+          {
+            ...soilTheme,
+            queryHints: ['hands mixing compost and soil', 'rich compost soil close up', 'worm castings compost', 'garden soil being prepared'],
+          },
+          wateringTheme,
+          {
+            ...growthTheme,
+            queryHints: ['raised bed vegetable garden', 'seedlings in rich soil', 'plant roots in rich soil', 'healthy garden bed'],
+          },
+          ctaTheme,
+        ]
+      : /pasture|hay|field/.test(name)
+        ? [
+            {
+              ...soilTheme,
+              queryHints: ['healthy field soil close up', 'farm field soil close up', 'hands checking soil in field', 'green pasture soil close up'],
+            },
+            {
+              ...wateringTheme,
+              queryHints: ['farm field watering grass', 'watering pasture field', 'green pasture grass close up', 'lawn irrigation field'],
+            },
+            {
+              ...growthTheme,
+              queryHints: ['green pasture grass close up', 'lush grass field sunrise', 'cattle grazing pasture', 'healthy pasture field'],
+            },
+            ctaTheme,
+          ]
+        : [soilTheme, wateringTheme, growthTheme, ctaTheme]
+
+  return specific
+}
+
 function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
   const text = (script || '').trim()
   if (!text) return ['']
@@ -396,11 +509,13 @@ function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
 }
 
 async function findPexelsVideos(product: Product, sceneCount: number): Promise<string[]> {
-  const queries = sceneBrollQueries(product)
+  const themes = sceneThemes(product)
   const count = Math.max(1, sceneCount)
   const urls: string[] = []
 
   for (let i = 0; i < count; i++) {
+    const theme = themes[i] || themes[themes.length - 1]
+    const queries = [...theme.queryHints, ...sceneBrollQueries(product)]
     const query = queries[i % queries.length] || product.category || product.name
     const tempProduct: Product = { ...product, brollQueries: [query] }
     const url = await findPexelsVideo(tempProduct)
@@ -624,9 +739,13 @@ async function main() {
     preview: script.replace(/\s+/g, ' ').trim().slice(0, 240),
   })
 
-  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 3))
+  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
   const brollUrls = await findPexelsVideos(product, sceneCount)
-  log('Selected b-roll scenes', { requestedScenes: sceneCount, selected: brollUrls.length })
+  log('Selected b-roll scenes', {
+    requestedScenes: sceneCount,
+    selected: brollUrls.length,
+    themes: sceneThemes(product).slice(0, sceneCount).map((theme) => theme.label),
+  })
   const videoId = await createHeyGenVideo(product, script, brollUrls)
   const videoUrl = await pollHeyGen(videoId)
   log('Finished video URL', { videoUrl })
