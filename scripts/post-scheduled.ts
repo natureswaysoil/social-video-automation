@@ -26,6 +26,7 @@ type State = {
 const ROOT = process.cwd()
 const CONFIG_PATH = path.resolve(ROOT, 'config/top-products.json')
 const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
+const FACEBOOK_GROUPS_PATH = path.resolve(ROOT, 'config/facebook-groups.json')
 const STATE_PATH = path.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json')
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
 
@@ -63,8 +64,12 @@ const SECRET_NAMES = [
   'INSTAGRAM_ACCOUNT_ID',
   'FB_PAGE_ACCESS_TOKEN',
   'FB_PAGE_ID',
+  'FB_GROUP_ACCESS_TOKEN',
+  'FB_GROUP_IDS',
   'FACEBOOK_PAGE_ACCESS_TOKEN',
   'FACEBOOK_PAGE_ID',
+  'FACEBOOK_GROUP_ACCESS_TOKEN',
+  'FACEBOOK_GROUP_IDS',
 ]
 
 function log(message: string, data?: any) {
@@ -140,6 +145,18 @@ function assertRequiredSecrets() {
   )
 }
 
+function parseIdList(value?: string): string[] {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+type GeneratedScript = {
+  fullVoiceover: string
+  sceneVoiceovers: string[]
+}
+
 function loadProducts(): Product[] {
   const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
   const products = Array.isArray(raw.topProducts) ? raw.topProducts : []
@@ -152,6 +169,21 @@ function loadCreativeProfiles() {
     return JSON.parse(fs.readFileSync(CREATIVE_PATH, 'utf8'))
   } catch {
     return { defaults: {}, profiles: {} }
+  }
+}
+
+function loadFacebookGroupAllowlist(): Set<string> {
+  try {
+    if (!fs.existsSync(FACEBOOK_GROUPS_PATH)) return new Set()
+    const parsed = JSON.parse(fs.readFileSync(FACEBOOK_GROUPS_PATH, 'utf8'))
+    const ids = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed.allowedGroupIds)
+        ? parsed.allowedGroupIds
+        : []
+    return new Set(ids.map((id: any) => String(id).trim()).filter(Boolean))
+  } catch {
+    return new Set()
   }
 }
 
@@ -190,10 +222,11 @@ function pickProduct(products: Product[]) {
   return { product, variationIndex, variationCount }
 }
 
-async function generateScript(product: Product, variationIndex: number, variationCount: number): Promise<string> {
+async function generateScript(product: Product, variationIndex: number, variationCount: number): Promise<GeneratedScript> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const minWords = Number(process.env.SCRIPT_MIN_WORDS || 48)
   const maxWords = Number(process.env.SCRIPT_MAX_WORDS || 68)
+  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
   const countWords = (text: string): number =>
     (text || '').trim().split(/\s+/).filter(Boolean).length
   const scenePlan = [
@@ -261,7 +294,10 @@ Hard rules:
 - No hype words like "miracle", "magic", or "secret formula".
 - No hashtags, emojis, bullets, or stage directions.
 - Keep it specific, concrete, and easy to understand.
-- Return only the final spoken voiceover text.`
+- Return only JSON with this shape:
+{"fullVoiceover":"...","scenes":[{"name":"Scene 1","voiceover":"..."},{"name":"Scene 2","voiceover":"..."},{"name":"Scene 3","voiceover":"..."},{"name":"Scene 4","voiceover":"..."}]}
+- The four scene voiceovers should be distinct and map to the scene plan above.
+- Keep each scene voiceover roughly balanced so the full script lands between ${minWords} and ${maxWords} words.`
 
   const response = await client.chat.completions.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -271,7 +307,18 @@ Hard rules:
   })
 
   const draft = response.choices[0]?.message?.content?.trim() || ''
-  if (!draft) return product.description
+  if (!draft) {
+    const fallbackScenes = fallbackScenesForScript(product, sceneCount)
+    return { fullVoiceover: fallbackScenes.map((scene) => scene.voiceover).join(' '), sceneVoiceovers: fallbackScenes.map((scene) => scene.voiceover) }
+  }
+
+  const polishedDraft = parseJson(draft)
+  const draftFullVoiceover = typeof polishedDraft?.fullVoiceover === 'string' ? polishedDraft.fullVoiceover.trim() : ''
+  const draftScenes = Array.isArray(polishedDraft?.scenes)
+    ? polishedDraft.scenes
+        .map((scene: any) => String(scene?.voiceover || '').trim())
+        .filter(Boolean)
+    : []
 
   const polishPrompt = `Polish this voiceover for clarity and conversion while keeping it compliant.
 
@@ -284,7 +331,7 @@ Requirements:
 - Output only the revised spoken voiceover.
 
 Draft:
-${draft}`
+${draftFullVoiceover || draft}`
 
   const polishedResponse = await client.chat.completions.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -292,9 +339,14 @@ ${draft}`
     temperature: 0.35,
     max_tokens: 260,
   })
-  const polished = polishedResponse.choices[0]?.message?.content?.trim() || draft
+  const polished = polishedResponse.choices[0]?.message?.content?.trim() || draftFullVoiceover || draft
   const polishedWordCount = countWords(polished)
-  if (polishedWordCount >= minWords && polishedWordCount <= maxWords) return polished || product.description
+  if (polishedWordCount >= minWords && polishedWordCount <= maxWords) {
+    return {
+      fullVoiceover: polished || product.description,
+      sceneVoiceovers: draftScenes.length === sceneCount ? draftScenes : splitScriptIntoScenes(polished || product.description, sceneCount),
+    }
+  }
 
   const compressPrompt = `Rewrite the voiceover to ${minWords}-${maxWords} words while preserving the same offer, compliance, and CTA.
 
@@ -315,7 +367,19 @@ ${polished}`
   })
 
   const compressed = compressedResponse.choices[0]?.message?.content?.trim() || polished
-  return compressed || draft || product.description
+  const sceneVoiceovers = draftScenes.length === sceneCount ? draftScenes : splitScriptIntoScenes(compressed || draftFullVoiceover || draft || product.description, sceneCount)
+  return {
+    fullVoiceover: compressed || draftFullVoiceover || draft || product.description,
+    sceneVoiceovers,
+  }
+}
+
+function fallbackScenesForScript(product: Product, sceneCount: number) {
+  const scenes = fallbackScenes(product, { scenes: [], hooks: [], cta: '' } as any)
+  return scenes.slice(0, Math.max(1, sceneCount)).map((scene, index) => ({
+    ...scene,
+    voiceover: scene.voiceover || `${product.name} helps support healthier soil and a better-looking result.`,
+  }))
 }
 
 async function findPexelsVideo(product: Product): Promise<string> {
@@ -599,6 +663,22 @@ function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
   return nonEmpty.length ? nonEmpty : [text]
 }
 
+function normalizeSceneVoiceovers(sceneVoiceovers: string[], sceneCount: number, fallbackScript: string): string[] {
+  const normalizedSceneCount = Math.max(1, sceneCount)
+  const trimmed = sceneVoiceovers.map((scene) => String(scene || '').trim()).filter(Boolean)
+  const base = trimmed.length >= normalizedSceneCount
+    ? trimmed.slice(0, normalizedSceneCount)
+    : splitScriptIntoScenes(fallbackScript, normalizedSceneCount)
+
+  if (!base.length) return [fallbackScript || '']
+
+  while (base.length < normalizedSceneCount) {
+    base.push(base[base.length - 1])
+  }
+
+  return base.slice(0, normalizedSceneCount)
+}
+
 async function findPexelsVideos(product: Product, sceneCount: number): Promise<string[]> {
   const themes = sceneThemes(product)
   const count = Math.max(1, sceneCount)
@@ -627,14 +707,15 @@ function avatarSettings(product: Product) {
   }
 }
 
-async function createHeyGenVideo(product: Product, script: string, brollUrls: string[]): Promise<string> {
+async function createHeyGenVideo(product: Product, sceneVoiceovers: string[], brollUrls: string[]): Promise<string> {
   const apiKey = process.env.HEYGEN_API_KEY
   if (!apiKey) throw new Error('Missing HEYGEN_API_KEY')
   const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
   const avatar = avatarSettings(product)
 
   const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
-  const scriptScenes = splitScriptIntoScenes(script, sceneCount)
+  const fallbackScript = sceneVoiceovers.join(' ').trim()
+  const scriptScenes = normalizeSceneVoiceovers(sceneVoiceovers, sceneCount, fallbackScript)
   const sceneBackgrounds = scriptScenes.map((_, index) => brollUrls[index] || brollUrls[0] || '')
 
   const videoInputs = scriptScenes.map((sceneScript, index) => {
@@ -810,6 +891,36 @@ async function postToFacebook(videoUrl: string, title: string, captionText: stri
   return postId
 }
 
+async function postToFacebookGroup(videoUrl: string, title: string, captionText: string, groupId: string): Promise<string> {
+  const allowedGroupIds = loadFacebookGroupAllowlist()
+  if (allowedGroupIds.size === 0) throw new Error('No Facebook group allowlist configured')
+  if (!allowedGroupIds.has(groupId)) throw new Error(`Facebook group ${groupId} is not in the allowlist`)
+
+  const groupAccessToken = pickEnv(['FB_GROUP_ACCESS_TOKEN', 'FACEBOOK_GROUP_ACCESS_TOKEN', 'FB_PAGE_ACCESS_TOKEN', 'FACEBOOK_PAGE_ACCESS_TOKEN'])
+  if (!groupAccessToken) throw new Error('Missing Facebook group access token')
+
+  const apiVersion = process.env.FACEBOOK_API_VERSION || 'v20.0'
+  const host = process.env.FACEBOOK_API_HOST || 'graph.facebook.com'
+  const baseUrl = `https://${host}/${apiVersion}`
+
+  const body = new URLSearchParams({
+    access_token: groupAccessToken,
+    file_url: videoUrl,
+    title: title.slice(0, 95),
+    description: captionText,
+    published: 'true',
+  })
+
+  const response = await axios.post(`${baseUrl}/${groupId}/videos`, body.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 180000,
+  })
+
+  const postId = response.data?.id || ''
+  if (!postId) throw new Error(`Facebook group ${groupId} publish did not return id`)
+  return postId
+}
+
 async function main() {
   await loadSecrets()
   assertRequiredSecrets()
@@ -820,7 +931,8 @@ async function main() {
 
   log('Scheduled product selected', { product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
 
-  const script = await generateScript(product, variationIndex, variationCount)
+  const scriptBundle = await generateScript(product, variationIndex, variationCount)
+  const script = scriptBundle.fullVoiceover
   const scriptWordCount = script.trim().split(/\s+/).filter(Boolean).length
   log('Generated script', {
     length: script.length,
@@ -835,7 +947,7 @@ async function main() {
     selected: brollUrls.length,
     themes: sceneThemes(product).slice(0, sceneCount).map((theme) => theme.label),
   })
-  const videoId = await createHeyGenVideo(product, script, brollUrls)
+  const videoId = await createHeyGenVideo(product, scriptBundle.sceneVoiceovers, brollUrls)
   const videoUrl = await pollHeyGen(videoId)
   log('Finished video URL', { videoUrl })
 
@@ -879,6 +991,32 @@ async function main() {
       log('Posted to Facebook', { id })
     } catch (error: any) {
       log('Facebook post failed', error?.message || error)
+    }
+
+    const groupIds = parseIdList(pickEnv(['FB_GROUP_IDS', 'FACEBOOK_GROUP_IDS']))
+    const allowedGroupIds = loadFacebookGroupAllowlist()
+    const approvedGroupIds = groupIds.filter((groupId) => allowedGroupIds.has(groupId))
+
+    if (groupIds.length > 0 && allowedGroupIds.size > 0) {
+      const skippedGroupIds = groupIds.filter((groupId) => !allowedGroupIds.has(groupId))
+      if (skippedGroupIds.length > 0) {
+        log('Skipping unapproved Facebook group IDs', { skippedGroupIds })
+      }
+
+      for (const groupId of approvedGroupIds) {
+        try {
+          const id = await postToFacebookGroup(videoUrl, product.name, captionText, groupId)
+          posted++
+          log('Posted to Facebook group', { groupId, id })
+        } catch (error: any) {
+          log('Facebook group post failed', { groupId, error: error?.message || error })
+        }
+      }
+      if (approvedGroupIds.length === 0) {
+        log('No configured Facebook group IDs matched the allowlist')
+      }
+    } else {
+      log('No Facebook group allowlist or group IDs configured; skipping group posts')
     }
   }
 
