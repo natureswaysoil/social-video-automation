@@ -1,120 +1,60 @@
 {
-  "allowedGroupIds": [],
+  "allowedGroupIds": [
+    "1556986231263022",
+    "814669161889110",
+    "4918535604827931",
+    "672132346258524",
+    "growingorganic",
+    "116169821854542",
+    "htfbpage",
+    "615243743264240",
+    "2431666350403548"
+  ],
   "routes": [
     {
-      "label": "horse pasture management",
+      "label": "Equine Pasture Management",
       "topics": ["pasture"],
-      "groupId": ""
+      "groupId": "1556986231263022"
     },
     {
-      "label": "hay field management",
+      "label": "Guild-Grazers: Pasture Management with the Farmers Guild",
       "topics": ["pasture"],
-      "groupId": ""
+      "groupId": "814669161889110"
     },
     {
-      "label": "cattle pasture management",
-      "topics": ["pasture"],
-      "groupId": ""
-    },
-    {
-      "label": "goat farming USA",
-      "topics": ["pasture"],
-      "groupId": ""
-    },
-    {
-      "label": "small farm pasture management",
-      "topics": ["pasture"],
-      "groupId": ""
-    },
-    {
-      "label": "homesteading livestock gardening",
+      "label": "Southern Homesteading — Farm, Livestock, and Gardening",
       "topics": ["pasture", "garden"],
-      "groupId": ""
+      "groupId": "4918535604827931"
     },
     {
-      "label": "forage management",
+      "label": "Small homestead farming",
       "topics": ["pasture"],
-      "groupId": ""
+      "groupId": "672132346258524"
     },
     {
-      "label": "Bermuda grass pasture",
-      "topics": ["pasture"],
-      "groupId": ""
-    },
-    {
-      "label": "organic vegetable gardening",
+      "label": "Organic Gardening",
       "topics": ["garden"],
-      "groupId": ""
+      "groupId": "growingorganic"
     },
     {
-      "label": "organic fertilizer gardening",
+      "label": "Homesteading & Gardening",
       "topics": ["garden"],
-      "groupId": ""
+      "groupId": "116169821854542"
     },
     {
-      "label": "backyard homesteading",
+      "label": "Homesteading Today",
       "topics": ["garden"],
-      "groupId": ""
+      "groupId": "htfbpage"
     },
     {
-      "label": "homesteading on a budget",
+      "label": "Backyard Homesteading",
       "topics": ["garden"],
-      "groupId": ""
+      "groupId": "615243743264240"
     },
     {
-      "label": "market gardening beginners",
-      "topics": ["garden"],
-      "groupId": ""
-    },
-    {
-      "label": "fruit tree growers",
-      "topics": ["garden"],
-      "groupId": ""
-    },
-    {
-      "label": "raised bed gardening",
-      "topics": ["garden"],
-      "groupId": ""
-    },
-    {
-      "label": "lawn care business owners",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "lawn care pros",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "lawn care marketing",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "landscaping business owners",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "Bermuda lawn care",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "fescue lawn care",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "DIY lawn care",
-      "topics": ["lawn"],
-      "groupId": ""
-    },
-    {
-      "label": "lawn care North Carolina",
-      "topics": ["lawn"],
-      "groupId": ""
+      "label": "Off Grid Living, Homesteading and Farming",
+      "topics": ["pasture", "garden"],
+      "groupId": "2431666350403548"
     }
   ]
 }
