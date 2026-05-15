@@ -170,8 +170,8 @@ function pickProduct(products: Product[]) {
 
 async function generateScript(product: Product, variationIndex: number, variationCount: number): Promise<string> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  const minWords = Number(process.env.SCRIPT_MIN_WORDS || 55)
-  const maxWords = Number(process.env.SCRIPT_MAX_WORDS || 80)
+  const minWords = Number(process.env.SCRIPT_MIN_WORDS || 48)
+  const maxWords = Number(process.env.SCRIPT_MAX_WORDS || 68)
   const countWords = (text: string): number =>
     (text || '').trim().split(/\s+/).filter(Boolean).length
   const angles = [
@@ -196,6 +196,8 @@ Product context:
 
 Goal:
 - Drive qualified clicks and purchases while staying truthful and compliant.
+- Sound like a direct-response ad, not a brochure.
+- Make the listener feel a specific problem, then a clear fix, then a reason to act now.
 
 Required structure (speak naturally, no section labels):
 - 0-3s: Pattern-interrupt hook tied to a painful problem.
@@ -207,6 +209,7 @@ Required structure (speak naturally, no section labels):
 Hard rules:
 - 25-35 seconds spoken length.
 - Target ${minWords}-${maxWords} words.
+- Keep the CTA direct and urgent, like "visit now" or "shop the product that fits your issue." 
 - No guarantees, no disease/pesticide cure claims, no instant-fix claims.
 - No hype words like "miracle", "magic", or "secret formula".
 - No hashtags, emojis, bullets, or stage directions.
@@ -275,7 +278,7 @@ async function findPexelsVideo(product: Product): Promise<string> {
   const query = queries[Math.floor(Date.now() / 3600000) % queries.length]
   const response = await axios.get('https://api.pexels.com/videos/search', {
     headers: { Authorization: apiKey },
-    params: { query, orientation: 'portrait', per_page: 5 },
+    params: { query, orientation: 'portrait', per_page: 10 },
     timeout: 30000,
   })
   const video = response.data?.videos?.[0]
@@ -311,6 +314,55 @@ async function findPexelsVideo(product: Product): Promise<string> {
   return url
 }
 
+function sceneBrollQueries(product: Product): string[] {
+  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
+  const base = [
+    ...(product.brollQueries || []),
+    ...(product.keywords || []),
+    product.category,
+    product.name,
+  ]
+
+  const themeQueries = /dog|urine|pet/.test(name)
+    ? [
+        'watering lawn with hose',
+        'green grass roots close up',
+        'healthy lawn soil close up',
+        'garden hose watering grass',
+        'lawn care soil amendment',
+        'lush backyard lawn close up',
+      ]
+    : /compost|biochar|worm|living/.test(name)
+      ? [
+          'hands mixing compost and soil',
+          'rich compost soil close up',
+          'raised bed vegetable garden',
+          'mulching garden bed',
+          'seedlings in rich soil',
+          'gardening hands soil close up',
+        ]
+      : /pasture|hay|field/.test(name)
+        ? [
+            'green pasture grass close up',
+            'farm field watering grass',
+            'healthy field soil close up',
+            'cattle grazing pasture',
+            'lush grass field sunrise',
+            'hands checking soil in field',
+          ]
+        : [
+            'healthy soil close up',
+            'watering vegetable garden',
+            'garden soil being prepared',
+            'mulching flower bed',
+            'seedlings in garden bed',
+            'hands working in soil',
+          ]
+
+  const queries = [...themeQueries, ...base].map((query) => String(query).trim()).filter(Boolean)
+  return [...new Set(queries)]
+}
+
 function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
   const text = (script || '').trim()
   if (!text) return ['']
@@ -344,13 +396,13 @@ function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
 }
 
 async function findPexelsVideos(product: Product, sceneCount: number): Promise<string[]> {
-  const queries = product.brollQueries?.length ? product.brollQueries : [product.category, product.name]
+  const queries = sceneBrollQueries(product)
   const count = Math.max(1, sceneCount)
   const urls: string[] = []
 
   for (let i = 0; i < count; i++) {
-    const rotated = [...queries.slice(i), ...queries.slice(0, i)]
-    const tempProduct: Product = { ...product, brollQueries: rotated }
+    const query = queries[i % queries.length] || product.category || product.name
+    const tempProduct: Product = { ...product, brollQueries: [query] }
     const url = await findPexelsVideo(tempProduct)
     if (url) urls.push(url)
   }
@@ -377,7 +429,7 @@ async function createHeyGenVideo(product: Product, script: string, brollUrls: st
   const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
   const avatar = avatarSettings(product)
 
-  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 3))
+  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
   const scriptScenes = splitScriptIntoScenes(script, sceneCount)
   const sceneBackgrounds = scriptScenes.map((_, index) => brollUrls[index] || brollUrls[0] || '')
 
