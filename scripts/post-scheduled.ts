@@ -161,6 +161,7 @@ type GeneratedScript = {
 type FacebookGroupRoute = {
   label: string
   groupId?: string
+  groupHandle?: string
   topics?: string[]
 }
 
