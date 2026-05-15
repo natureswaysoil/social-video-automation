@@ -25,6 +25,7 @@ type State = {
 
 const ROOT = process.cwd()
 const CONFIG_PATH = path.resolve(ROOT, 'config/top-products.json')
+const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
 const STATE_PATH = path.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json')
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
 
@@ -37,6 +38,18 @@ const SECRET_NAMES = [
   'HEYGEN_DEFAULT_VOICE',
   'HEYGEN_AVATAR_SCALE',
   'HEYGEN_AVATAR_OFFSET_Y',
+  'HEYGEN_AVATAR_DOG_OWNER',
+  'HEYGEN_AVATAR_GARDENER',
+  'HEYGEN_AVATAR_FARMER',
+  'HEYGEN_AVATAR_HOMEOWNER',
+  'HEYGEN_AVATAR_SCALE_DOG_OWNER',
+  'HEYGEN_AVATAR_SCALE_GARDENER',
+  'HEYGEN_AVATAR_SCALE_FARMER',
+  'HEYGEN_AVATAR_SCALE_HOMEOWNER',
+  'HEYGEN_AVATAR_OFFSET_Y_DOG_OWNER',
+  'HEYGEN_AVATAR_OFFSET_Y_GARDENER',
+  'HEYGEN_AVATAR_OFFSET_Y_FARMER',
+  'HEYGEN_AVATAR_OFFSET_Y_HOMEOWNER',
   'PEXELS_API_KEY',
   'YT_CLIENT_ID',
   'YT_CLIENT_SECRET',
@@ -133,6 +146,15 @@ function loadProducts(): Product[] {
   return products.slice(0, Number(process.env.SEED_PRODUCT_LIMIT || 5))
 }
 
+function loadCreativeProfiles() {
+  try {
+    if (!fs.existsSync(CREATIVE_PATH)) return { defaults: {}, profiles: {} }
+    return JSON.parse(fs.readFileSync(CREATIVE_PATH, 'utf8'))
+  } catch {
+    return { defaults: {}, profiles: {} }
+  }
+}
+
 function readState(): State {
   try {
     if (!fs.existsSync(STATE_PATH)) return { ...DEFAULT_STATE }
@@ -175,10 +197,26 @@ async function generateScript(product: Product, variationIndex: number, variatio
   const countWords = (text: string): number =>
     (text || '').trim().split(/\s+/).filter(Boolean).length
   const scenePlan = [
-    'Scene 1: soil close-up that shows the issue or the starting point.',
-    'Scene 2: watering or gardening action that shows simple use or care.',
-    'Scene 3: plant or lawn growth that shows the result the viewer wants.',
-    'Scene 4: clean final CTA shot with a direct website call to action.',
+    {
+      scene: 'Scene 1',
+      job: 'Hook',
+      instruction: 'Open on the exact problem in the soil, lawn, or garden that the viewer wants fixed.',
+    },
+    {
+      scene: 'Scene 2',
+      job: 'Body',
+      instruction: 'Explain the simple action, product use, or feeding step in a clear, practical way.',
+    },
+    {
+      scene: 'Scene 3',
+      job: 'Body',
+      instruction: 'Show the growth, recovery, or healthier-looking result the viewer is trying to get.',
+    },
+    {
+      scene: 'Scene 4',
+      job: 'CTA',
+      instruction: 'Close with a direct, urgent call to visit the website and shop now.',
+    },
   ]
   const angles = [
     'quick win for busy homeowners',
@@ -213,7 +251,7 @@ Required structure (speak naturally, no section labels):
 - 30-35s: Clear action CTA to visit the website now.
 
 Scene plan to match while writing:
-${scenePlan.map((line) => `- ${line}`).join('\n')}
+${scenePlan.map((item) => `- ${item.scene} (${item.job}): ${item.instruction}`).join('\n')}
 
 Hard rules:
 - 25-35 seconds spoken length.
@@ -476,6 +514,59 @@ function sceneThemes(product: Product): SceneTheme[] {
   return specific
 }
 
+function avatarTheme(product: Product): 'dog-owner' | 'gardener' | 'farmer' | 'homeowner' {
+  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
+  if (/dog|urine|pet/.test(name)) return 'dog-owner'
+  if (/pasture|hay|field|farm/.test(name)) return 'farmer'
+  if (/compost|biochar|worm|living|soil|garden|humic|seaweed/.test(name)) return 'gardener'
+  return 'homeowner'
+}
+
+function avatarProfile(product: Product) {
+  const creativeProfiles = loadCreativeProfiles()
+  const creative = {
+    ...(creativeProfiles.defaults || {}),
+    ...((creativeProfiles.profiles || {})[product.id] || {}),
+  }
+
+  const theme = avatarTheme(product)
+  const profiles = {
+    'dog-owner': {
+      avatarId: process.env.HEYGEN_AVATAR_DOG_OWNER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
+      voiceId: process.env.HEYGEN_VOICE_DOG_OWNER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
+      scale: Number(process.env.HEYGEN_AVATAR_SCALE_DOG_OWNER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.47),
+      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_DOG_OWNER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.1),
+    },
+    gardener: {
+      avatarId: process.env.HEYGEN_AVATAR_GARDENER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
+      voiceId: process.env.HEYGEN_VOICE_GARDENER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
+      scale: Number(process.env.HEYGEN_AVATAR_SCALE_GARDENER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.45),
+      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_GARDENER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.12),
+    },
+    farmer: {
+      avatarId: process.env.HEYGEN_AVATAR_FARMER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
+      voiceId: process.env.HEYGEN_VOICE_FARMER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
+      scale: Number(process.env.HEYGEN_AVATAR_SCALE_FARMER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.46),
+      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_FARMER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.12),
+    },
+    homeowner: {
+      avatarId: process.env.HEYGEN_AVATAR_HOMEOWNER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
+      voiceId: process.env.HEYGEN_VOICE_HOMEOWNER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
+      scale: Number(process.env.HEYGEN_AVATAR_SCALE_HOMEOWNER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.48),
+      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_HOMEOWNER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.1),
+    },
+  } as const
+
+  const profile = profiles[theme]
+  return {
+    theme,
+    avatar_id: profile.avatarId || 'Daisy-inskirt-20220818',
+    voice_id: profile.voiceId || '2d5b0e6cf36f460aa7fc47e3eee4ba54',
+    scale: profile.scale,
+    offsetY: profile.offsetY,
+  }
+}
+
 function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
   const text = (script || '').trim()
   if (!text) return ['']
@@ -526,15 +617,13 @@ async function findPexelsVideos(product: Product, sceneCount: number): Promise<s
 }
 
 function avatarSettings(product: Product) {
-  const hay = /hay|pasture|forage|cattle|field/i.test(`${product.name} ${product.category}`)
-  const dog = /dog|urine|yellow|pet/i.test(`${product.name} ${product.category}`)
-  const scale = Number(process.env.HEYGEN_AVATAR_SCALE || (hay ? 0.44 : dog ? 0.47 : 0.5))
-  const offsetY = Number(process.env.HEYGEN_AVATAR_OFFSET_Y || (hay ? 0.14 : 0.1))
+  const profile = avatarProfile(product)
   return {
-    avatar_id: process.env.HEYGEN_DEFAULT_AVATAR || 'Daisy-inskirt-20220818',
-    voice_id: process.env.HEYGEN_DEFAULT_VOICE || '2d5b0e6cf36f460aa7fc47e3eee4ba54',
-    scale,
-    offsetY,
+    avatar_id: profile.avatar_id,
+    voice_id: profile.voice_id,
+    scale: profile.scale,
+    offsetY: profile.offsetY,
+    theme: profile.theme,
   }
 }
 
@@ -584,7 +673,7 @@ async function createHeyGenVideo(product: Product, script: string, brollUrls: st
 
   const videoId = response.data?.data?.video_id || response.data?.video_id
   if (!videoId) throw new Error('HeyGen did not return video_id')
-  log('HeyGen video job created', { videoId, avatarScale: avatar.scale, scenes: videoInputs.length })
+  log('HeyGen video job created', { videoId, avatarScale: avatar.scale, avatarTheme: avatar.theme, scenes: videoInputs.length })
   return videoId
 }
 
