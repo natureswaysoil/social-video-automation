@@ -30,6 +30,22 @@ Current rotation:
 4. Hay, Pasture & Lawn Fertilizer
 5. Seaweed & Humic Acid Lawn Treatment
 
+## Facebook groups
+
+If you want to post to Facebook groups, add the approved group IDs to:
+
+```text
+config/facebook-groups.json
+```
+
+The script will only post to group IDs that appear in that allowlist.
+
+The same file also contains topic-based educational routes for pasture, garden,
+and lawn content. Fill in the `groupId` values for the routes you want to use.
+
+The scheduled workflow now prefers `NWS_021` on a reset run so the next post
+starts with pasture content instead of repeating the compost creative.
+
 ## Local test
 
 ```bash

@@ -1,0 +1,120 @@
+{
+  "allowedGroupIds": [],
+  "routes": [
+    {
+      "label": "horse pasture management",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "hay field management",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "cattle pasture management",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "goat farming USA",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "small farm pasture management",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "homesteading livestock gardening",
+      "topics": ["pasture", "garden"],
+      "groupId": ""
+    },
+    {
+      "label": "forage management",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "Bermuda grass pasture",
+      "topics": ["pasture"],
+      "groupId": ""
+    },
+    {
+      "label": "organic vegetable gardening",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "organic fertilizer gardening",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "backyard homesteading",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "homesteading on a budget",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "market gardening beginners",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "fruit tree growers",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "raised bed gardening",
+      "topics": ["garden"],
+      "groupId": ""
+    },
+    {
+      "label": "lawn care business owners",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "lawn care pros",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "lawn care marketing",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "landscaping business owners",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "Bermuda lawn care",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "fescue lawn care",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "DIY lawn care",
+      "topics": ["lawn"],
+      "groupId": ""
+    },
+    {
+      "label": "lawn care North Carolina",
+      "topics": ["lawn"],
+      "groupId": ""
+    }
+  ]
+}

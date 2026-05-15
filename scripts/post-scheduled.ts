@@ -29,6 +29,7 @@ const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
 const FACEBOOK_GROUPS_PATH = path.resolve(ROOT, 'config/facebook-groups.json')
 const STATE_PATH = path.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json')
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
+const DEFAULT_FIRST_PRODUCT_ID = process.env.NEXT_PRODUCT_PREFERRED_ID || 'NWS_021'
 
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
@@ -157,6 +158,12 @@ type GeneratedScript = {
   sceneVoiceovers: string[]
 }
 
+type FacebookGroupRoute = {
+  label: string
+  groupId?: string
+  topics?: string[]
+}
+
 function loadProducts(): Product[] {
   const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
   const products = Array.isArray(raw.topProducts) ? raw.topProducts : []
@@ -187,6 +194,17 @@ function loadFacebookGroupAllowlist(): Set<string> {
   }
 }
 
+function loadFacebookGroupRoutes(): FacebookGroupRoute[] {
+  try {
+    if (!fs.existsSync(FACEBOOK_GROUPS_PATH)) return []
+    const parsed = JSON.parse(fs.readFileSync(FACEBOOK_GROUPS_PATH, 'utf8'))
+    if (Array.isArray(parsed?.routes)) return parsed.routes
+    return []
+  } catch {
+    return []
+  }
+}
+
 function readState(): State {
   try {
     if (!fs.existsSync(STATE_PATH)) return { ...DEFAULT_STATE }
@@ -208,6 +226,22 @@ function writeState(state: State) {
 
 function pickProduct(products: Product[]) {
   const state = readState()
+  if ((state.cursor < 0 || !products[state.cursor]) && DEFAULT_FIRST_PRODUCT_ID) {
+    const preferredIndex = products.findIndex((product) => product.id === DEFAULT_FIRST_PRODUCT_ID)
+    if (preferredIndex >= 0) {
+      const product = products[preferredIndex]
+      const variationCount = Number(process.env.VARIATIONS_PER_PRODUCT || 5)
+      const lastVariation = state.variationByProduct[product.id]
+      const variationIndex = typeof lastVariation === 'number' ? (lastVariation + 1) % variationCount : 0
+
+      state.cursor = preferredIndex
+      state.variationByProduct[product.id] = variationIndex
+      state.lastRunAt = new Date().toISOString()
+      writeState(state)
+
+      return { product, variationIndex, variationCount }
+    }
+  }
   const nextCursor = (state.cursor + 1) % products.length
   const product = products[nextCursor]
   const variationCount = Number(process.env.VARIATIONS_PER_PRODUCT || 5)
@@ -584,6 +618,24 @@ function avatarTheme(product: Product): 'dog-owner' | 'gardener' | 'farmer' | 'h
   if (/pasture|hay|field|farm/.test(name)) return 'farmer'
   if (/compost|biochar|worm|living|soil|garden|humic|seaweed/.test(name)) return 'gardener'
   return 'homeowner'
+}
+
+function educationTopicForProduct(product: Product): 'pasture' | 'garden' | 'lawn' {
+  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
+  if (/pasture|hay|field|farm|cattle|goat|forage|bermuda grass pasture/.test(name)) return 'pasture'
+  if (/compost|biochar|worm|raised bed|vegetable|fruit tree|homestead|organic/.test(name)) return 'garden'
+  return 'lawn'
+}
+
+function resolveFacebookGroupRoutes(product: Product): FacebookGroupRoute[] {
+  const topic = educationTopicForProduct(product)
+  const routes = loadFacebookGroupRoutes()
+  if (!routes.length) return []
+
+  return routes.filter((route) => {
+    const topics = (route.topics || []).map((value) => String(value).toLowerCase())
+    return topics.length === 0 || topics.includes(topic)
+  })
 }
 
 function avatarProfile(product: Product) {
@@ -996,6 +1048,7 @@ async function main() {
     const groupIds = parseIdList(pickEnv(['FB_GROUP_IDS', 'FACEBOOK_GROUP_IDS']))
     const allowedGroupIds = loadFacebookGroupAllowlist()
     const approvedGroupIds = groupIds.filter((groupId) => allowedGroupIds.has(groupId))
+    const routedGroups = resolveFacebookGroupRoutes(product)
 
     if (groupIds.length > 0 && allowedGroupIds.size > 0) {
       const skippedGroupIds = groupIds.filter((groupId) => !allowedGroupIds.has(groupId))
@@ -1017,6 +1070,35 @@ async function main() {
       }
     } else {
       log('No Facebook group allowlist or group IDs configured; skipping group posts')
+    }
+
+    if (routedGroups.length > 0) {
+      const routedGroupIds = routedGroups
+        .map((route) => route.groupId || '')
+        .map((groupId) => groupId.trim())
+        .filter(Boolean)
+
+      if (routedGroupIds.length === 0) {
+        log('Facebook educational group routes configured but no group IDs are set yet', {
+          routes: routedGroups.map((route) => route.label),
+          topic: educationTopicForProduct(product),
+        })
+      } else {
+        const dedupedGroupIds = [...new Set(routedGroupIds)]
+        for (const groupId of dedupedGroupIds) {
+          if (!allowedGroupIds.has(groupId)) {
+            log('Skipping unrouted Facebook group because it is not allowlisted', { groupId })
+            continue
+          }
+          try {
+            const id = await postToFacebookGroup(videoUrl, product.name, captionText, groupId)
+            posted++
+            log('Posted to routed Facebook group', { groupId, id, topic: educationTopicForProduct(product) })
+          } catch (error: any) {
+            log('Routed Facebook group post failed', { groupId, error: error?.message || error })
+          }
+        }
+      }
     }
   }
 
