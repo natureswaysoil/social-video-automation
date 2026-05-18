@@ -256,7 +256,7 @@ function fallbackScenes(product: Product, profile: CreativeProfile): CreativeSce
   if (profile.scenes?.length) {
     return profile.scenes.slice(0, 5).map((scene, index) => ({
       ...scene,
-      useProductImage: scene.useProductImage ?? index === 1 || index === 4,
+      useProductImage: scene.useProductImage ?? (index === 1 || index === 4),
     }))
   }
 

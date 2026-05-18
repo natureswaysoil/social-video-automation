@@ -47,7 +47,7 @@
       "scenes": [
         { "name": "problem", "seconds": 7, "brollQueries": ["weak garden plants", "dry garden soil close up", "stressed vegetable garden"] },
         { "name": "root zone", "seconds": 8, "brollQueries": ["plant roots in soil", "healthy white roots close up", "rich soil close up"] },
-        { "name": "ingredients", "seconds": 8, "brollQueries": ["kelp seaweed ocean", "seaweed kelp close up", "liquid fertilizer pouring"] },
+        { "name": "ingredients", "seconds": 8, "brollQueries": ["kelp extract lawn treatment", "liquid kelp fertilizer mixing", "liquid fertilizer pouring"] },
         { "name": "result and CTA", "seconds": 7, "brollQueries": ["healthy vegetable garden", "lush garden plants", "green lawn close up"] }
       ]
     },
@@ -109,7 +109,7 @@
       ],
       "scenes": [
         { "name": "lawn problem", "seconds": 7, "brollQueries": ["patchy lawn close up", "dry lawn grass close up", "home lawn problem"] },
-        { "name": "ingredients", "seconds": 8, "brollQueries": ["seaweed kelp ocean", "kelp seaweed close up", "humic acid soil close up"] },
+        { "name": "ingredients", "seconds": 8, "brollQueries": ["seaweed extract lawn treatment", "liquid kelp fertilizer bottle", "humic acid soil close up"] },
         { "name": "application", "seconds": 8, "brollQueries": ["watering green lawn", "spraying lawn with hose", "lawn care application"] },
         { "name": "result and CTA", "seconds": 7, "brollQueries": ["lush green lawn close up", "healthy lawn sunset", "green grass roots close up"] }
       ]
