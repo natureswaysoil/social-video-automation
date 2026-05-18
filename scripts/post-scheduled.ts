@@ -15,6 +15,7 @@ type Product = {
   websiteUrl: string
   keywords?: string[]
   brollQueries?: string[]
+  productImageUrl?: string
 }
 
 type State = {
@@ -23,13 +24,40 @@ type State = {
   lastRunAt?: string
 }
 
+type CreativeScene = {
+  name: string
+  seconds?: number
+  voiceover?: string
+  brollQueries?: string[]
+  brollQuery?: string
+  useProductImage?: boolean
+}
+
+type CreativeProfile = {
+  avatarId?: string
+  voiceId?: string
+  avatarScale?: number
+  avatarOffsetY?: number
+  audience?: string
+  angle?: string
+  tone?: string
+  cta?: string
+  hooks?: string[]
+  scenes?: CreativeScene[]
+}
+
+type CreativeProfilesFile = {
+  defaults?: CreativeProfile
+  profiles?: Record<string, CreativeProfile>
+}
+
 const ROOT = process.cwd()
 const CONFIG_PATH = path.resolve(ROOT, 'config/top-products.json')
-const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
-const FACEBOOK_GROUPS_PATH = path.resolve(ROOT, 'config/facebook-groups.json')
 const STATE_PATH = path.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json')
+const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
+const WINNING_SEQUENCE_PATH = path.resolve(ROOT, 'config/may6-winning-sequence.json')
+const PRODUCT_IMAGES_PATH = path.resolve(ROOT, 'config/product-images.json')
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
-const DEFAULT_FIRST_PRODUCT_ID = process.env.NEXT_PRODUCT_PREFERRED_ID || 'NWS_021'
 
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
@@ -40,18 +68,6 @@ const SECRET_NAMES = [
   'HEYGEN_DEFAULT_VOICE',
   'HEYGEN_AVATAR_SCALE',
   'HEYGEN_AVATAR_OFFSET_Y',
-  'HEYGEN_AVATAR_DOG_OWNER',
-  'HEYGEN_AVATAR_GARDENER',
-  'HEYGEN_AVATAR_FARMER',
-  'HEYGEN_AVATAR_HOMEOWNER',
-  'HEYGEN_AVATAR_SCALE_DOG_OWNER',
-  'HEYGEN_AVATAR_SCALE_GARDENER',
-  'HEYGEN_AVATAR_SCALE_FARMER',
-  'HEYGEN_AVATAR_SCALE_HOMEOWNER',
-  'HEYGEN_AVATAR_OFFSET_Y_DOG_OWNER',
-  'HEYGEN_AVATAR_OFFSET_Y_GARDENER',
-  'HEYGEN_AVATAR_OFFSET_Y_FARMER',
-  'HEYGEN_AVATAR_OFFSET_Y_HOMEOWNER',
   'PEXELS_API_KEY',
   'YT_CLIENT_ID',
   'YT_CLIENT_SECRET',
@@ -63,15 +79,22 @@ const SECRET_NAMES = [
   'INSTAGRAM_IG_ID',
   'INSTAGRAM_USER_ID',
   'INSTAGRAM_ACCOUNT_ID',
-  'FB_PAGE_ACCESS_TOKEN',
-  'FB_PAGE_ID',
-  'FB_GROUP_ACCESS_TOKEN',
-  'FB_GROUP_IDS',
-  'FACEBOOK_PAGE_ACCESS_TOKEN',
-  'FACEBOOK_PAGE_ID',
-  'FACEBOOK_GROUP_ACCESS_TOKEN',
-  'FACEBOOK_GROUP_IDS',
 ]
+
+const BROLL_BLOCKED_TERMS = [
+  'ocean',
+  'underwater',
+  'reef',
+  'beach',
+  'marine',
+  'scuba',
+  'snorkel',
+  'fish',
+  'whale',
+  'coral',
+]
+
+const STRICT_BROLL_QUERY_QA = String(process.env.STRICT_BROLL_QUERY_QA || 'true').toLowerCase() !== 'false'
 
 function log(message: string, data?: any) {
   if (data === undefined) console.log(message)
@@ -134,75 +157,46 @@ async function loadSecrets() {
   }
 }
 
-function assertRequiredSecrets() {
-  const required = ['OPENAI_API_KEY', 'HEYGEN_API_KEY', 'PEXELS_API_KEY']
-  const missing = required.filter((name) => !hasValue(name))
-  if (missing.length === 0) return
-
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'unknown'
-  throw new Error(
-    `Missing required secrets after secret loading: ${missing.join(', ')}. ` +
-    `Verify these secrets exist and are accessible in Google Secret Manager for project ${projectId}.`,
-  )
-}
-
-function parseIdList(value?: string): string[] {
-  return String(value || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-type GeneratedScript = {
-  fullVoiceover: string
-  sceneVoiceovers: string[]
-}
-
-type FacebookGroupRoute = {
-  label: string
-  groupId?: string
-  groupHandle?: string
-  topics?: string[]
-}
-
 function loadProducts(): Product[] {
   const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
   const products = Array.isArray(raw.topProducts) ? raw.topProducts : []
-  return products.slice(0, Number(process.env.SEED_PRODUCT_LIMIT || 5))
+  const imageMap = loadProductImageMap()
+  return products
+    .slice(0, Number(process.env.SEED_PRODUCT_LIMIT || 5))
+    .map((product: Product) => ({
+      ...product,
+      productImageUrl: product.productImageUrl || imageMap[product.id] || '',
+    }))
 }
 
-function loadCreativeProfiles() {
+function loadProductImageMap(): Record<string, string> {
   try {
-    if (!fs.existsSync(CREATIVE_PATH)) return { defaults: {}, profiles: {} }
+    const raw = JSON.parse(fs.readFileSync(PRODUCT_IMAGES_PATH, 'utf8'))
+    const byProductId = raw?.byProductId || {}
+    const out: Record<string, string> = {}
+    for (const key of Object.keys(byProductId)) {
+      const value = String(byProductId[key] || '').trim()
+      if (value) out[key] = value
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function loadCreativeProfiles(): CreativeProfilesFile {
+  try {
     return JSON.parse(fs.readFileSync(CREATIVE_PATH, 'utf8'))
   } catch {
     return { defaults: {}, profiles: {} }
   }
 }
 
-function loadFacebookGroupAllowlist(): Set<string> {
+function loadWinningSequence() {
   try {
-    if (!fs.existsSync(FACEBOOK_GROUPS_PATH)) return new Set()
-    const parsed = JSON.parse(fs.readFileSync(FACEBOOK_GROUPS_PATH, 'utf8'))
-    const ids = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray(parsed.allowedGroupIds)
-        ? parsed.allowedGroupIds
-        : []
-    return new Set(ids.map((id: any) => String(id).trim()).filter(Boolean))
+    return JSON.parse(fs.readFileSync(WINNING_SEQUENCE_PATH, 'utf8'))
   } catch {
-    return new Set()
-  }
-}
-
-function loadFacebookGroupRoutes(): FacebookGroupRoute[] {
-  try {
-    if (!fs.existsSync(FACEBOOK_GROUPS_PATH)) return []
-    const parsed = JSON.parse(fs.readFileSync(FACEBOOK_GROUPS_PATH, 'utf8'))
-    if (Array.isArray(parsed?.routes)) return parsed.routes
-    return []
-  } catch {
-    return []
+    return { defaultSequence: [] }
   }
 }
 
@@ -227,22 +221,6 @@ function writeState(state: State) {
 
 function pickProduct(products: Product[]) {
   const state = readState()
-  if ((state.cursor < 0 || !products[state.cursor]) && DEFAULT_FIRST_PRODUCT_ID) {
-    const preferredIndex = products.findIndex((product) => product.id === DEFAULT_FIRST_PRODUCT_ID)
-    if (preferredIndex >= 0) {
-      const product = products[preferredIndex]
-      const variationCount = Number(process.env.VARIATIONS_PER_PRODUCT || 5)
-      const lastVariation = state.variationByProduct[product.id]
-      const variationIndex = typeof lastVariation === 'number' ? (lastVariation + 1) % variationCount : 0
-
-      state.cursor = preferredIndex
-      state.variationByProduct[product.id] = variationIndex
-      state.lastRunAt = new Date().toISOString()
-      writeState(state)
-
-      return { product, variationIndex, variationCount }
-    }
-  }
   const nextCursor = (state.cursor + 1) % products.length
   const product = products[nextCursor]
   const variationCount = Number(process.env.VARIATIONS_PER_PRODUCT || 5)
@@ -257,526 +235,249 @@ function pickProduct(products: Product[]) {
   return { product, variationIndex, variationCount }
 }
 
-async function generateScript(product: Product, variationIndex: number, variationCount: number): Promise<GeneratedScript> {
+function productCreativeProfile(product: Product): CreativeProfile {
+  const creative = loadCreativeProfiles()
+  return {
+    ...(creative.defaults || {}),
+    ...((creative.profiles || {})[product.id] || {}),
+  }
+}
+
+function fallbackScenes(product: Product, profile: CreativeProfile): CreativeScene[] {
+  const winning = loadWinningSequence()
+  const defaultSequence = Array.isArray(winning.defaultSequence) ? winning.defaultSequence : []
+  const fromWinning = defaultSequence.map((scene: any, index: number) => ({
+    name: String(scene?.name || `scene-${index + 1}`),
+    seconds: Number(scene?.durationSeconds || 6),
+    brollQueries: Array.isArray(scene?.exampleVisuals) ? scene.exampleVisuals : (product.brollQueries || [product.category]),
+    useProductImage: index === 1 || index === 4,
+  }))
+
+  if (profile.scenes?.length) {
+    return profile.scenes.slice(0, 5).map((scene, index) => ({
+      ...scene,
+      useProductImage: scene.useProductImage ?? index === 1 || index === 4,
+    }))
+  }
+
+  if (fromWinning.length) return fromWinning.slice(0, 5)
+
+  return [
+    { name: 'problem', seconds: 5, brollQueries: product.brollQueries || [product.category] },
+    { name: 'product hero', seconds: 5, brollQueries: product.brollQueries || [product.name], useProductImage: true },
+    { name: 'application', seconds: 6, brollQueries: ['watering lawn', 'garden application'] },
+    { name: 'soil benefit', seconds: 6, brollQueries: ['healthy roots', 'rich soil close up'] },
+    { name: 'result', seconds: 6, brollQueries: product.brollQueries || [product.category] },
+  ]
+}
+
+function parseJson(text: string): any {
+  try {
+    return JSON.parse(text)
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    try {
+      return JSON.parse(match[0])
+    } catch {
+      return null
+    }
+  }
+}
+
+function chooseHook(profile: CreativeProfile, variationIndex: number): string {
+  const hooks = profile.hooks || []
+  if (!hooks.length) return ''
+  return hooks[variationIndex % hooks.length] || ''
+}
+
+async function generateScenePlan(product: Product, profile: CreativeProfile, variationIndex: number, variationCount: number): Promise<{ fullVoiceover: string, scenes: CreativeScene[] }> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  const minWords = Number(process.env.SCRIPT_MIN_WORDS || 48)
-  const maxWords = Number(process.env.SCRIPT_MAX_WORDS || 68)
-  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
-  const countWords = (text: string): number =>
-    (text || '').trim().split(/\s+/).filter(Boolean).length
-  const scenePlan = [
-    {
-      scene: 'Scene 1',
-      job: 'Hook',
-      instruction: 'Open on the exact problem in the soil, lawn, or garden that the viewer wants fixed.',
-    },
-    {
-      scene: 'Scene 2',
-      job: 'Body',
-      instruction: 'Explain the simple action, product use, or feeding step in a clear, practical way.',
-    },
-    {
-      scene: 'Scene 3',
-      job: 'Body',
-      instruction: 'Show the growth, recovery, or healthier-looking result the viewer is trying to get.',
-    },
-    {
-      scene: 'Scene 4',
-      job: 'CTA',
-      instruction: 'Close with a direct, urgent call to visit the website and shop now.',
-    },
-  ]
-  const angles = [
-    'quick win for busy homeowners',
-    'fix a frustrating recurring lawn issue',
-    'pet-owner friendly yard recovery focus',
-    'seasonal lawn prep and prevention',
-    'save time versus trial-and-error methods',
-    'beginner-friendly, simple next-step guidance',
-  ]
-  const angle = angles[variationIndex % angles.length]
+  const baseScenes = fallbackScenes(product, profile)
+  const scenePrompt = baseScenes
+    .map((scene, index) => `${index + 1}. ${scene.name} (${scene.seconds || 6}s) :: ${(scene.brollQueries || [scene.brollQuery || product.category]).join(' | ')}`)
+    .join('\n')
+  const preferredHook = chooseHook(profile, variationIndex)
 
-  const prompt = `You are writing a high-converting short-form product sales voiceover for Nature's Way Soil.
+  const prompt = `Create a high-retention 25-35 second vertical product video script and scene plan for Nature's Way Soil.
 
-Product context:
-- Product: ${product.name}
-- Description: ${product.description}
-- Category: ${product.category}
-- Website: ${product.websiteUrl}
-- Variation: ${variationIndex + 1} of ${variationCount}
-- Sales angle: ${angle}
+Product: ${product.name}
+Description: ${product.description}
+Category: ${product.category}
+Website: ${product.websiteUrl}
+Variation: ${variationIndex + 1} of ${variationCount}; use a fresh opening hook.
+Audience: ${profile.audience || 'home and land owners'}
+Angle: ${profile.angle || 'soil-first product explanation'}
+Tone: ${profile.tone || 'plainspoken and practical'}
+Preferred opening hook: ${preferredHook || 'none'}
+Target scene flow:\n${scenePrompt}
 
-Goal:
-- Drive qualified clicks and purchases while staying truthful and compliant.
-- Sound like a direct-response ad, not a brochure.
-- Make the listener feel a specific problem, then a clear fix, then a reason to act now.
-
-Required structure (speak naturally, no section labels):
-- 0-3s: Pattern-interrupt hook tied to a painful problem.
-- 3-10s: Call out who this is for and why common fixes fail.
-- 10-22s: Explain how this product helps in practical, plain language.
-- 22-30s: Add credibility signal (experience, consistency, routine, or practical proof-style language without fabricating stats/testimonials).
-- 30-35s: Clear action CTA to visit the website now.
-
-Scene plan to match while writing:
-${scenePlan.map((item) => `- ${item.scene} (${item.job}): ${item.instruction}`).join('\n')}
-
-Hard rules:
-- 25-35 seconds spoken length.
-- Target ${minWords}-${maxWords} words.
-- Keep the CTA direct and urgent, like "visit now" or "shop the product that fits your issue." 
-- No guarantees, no disease/pesticide cure claims, no instant-fix claims.
-- No hype words like "miracle", "magic", or "secret formula".
-- No hashtags, emojis, bullets, or stage directions.
-- Keep it specific, concrete, and easy to understand.
-- Return only JSON with this shape:
-{"fullVoiceover":"...","scenes":[{"name":"Scene 1","voiceover":"..."},{"name":"Scene 2","voiceover":"..."},{"name":"Scene 3","voiceover":"..."},{"name":"Scene 4","voiceover":"..."}]}
-- The four scene voiceovers should be distinct and map to the scene plan above.
-- Keep each scene voiceover roughly balanced so the full script lands between ${minWords} and ${maxWords} words.`
+Rules:
+- Keep it honest and compliant.
+- Do not guarantee results.
+- Do not claim pesticide, disease cure, or instant fix.
+- Sound natural, direct, and helpful.
+- Keep each scene visual-focused and avoid static talking-head feel.
+- Scene 2 should be product-hero oriented.
+- End with a direct website call to action.
+- Return only JSON in this exact shape:
+  {"fullVoiceover":"...","scenes":[{"name":"...","seconds":6,"voiceover":"...","brollQuery":"..."}]}
+- Provide exactly 5 scenes.`
 
   const response = await client.chat.completions.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
-    temperature: 0.65,
-    max_tokens: 260,
+    temperature: 0.7,
+    max_tokens: 700,
   })
 
-  const draft = response.choices[0]?.message?.content?.trim() || ''
-  if (!draft) {
-    const fallbackScenes = fallbackScenesForScript(product, sceneCount)
-    return { fullVoiceover: fallbackScenes.map((scene) => scene.voiceover).join(' '), sceneVoiceovers: fallbackScenes.map((scene) => scene.voiceover) }
-  }
-
-  const polishedDraft = parseJson(draft)
-  const draftFullVoiceover = typeof polishedDraft?.fullVoiceover === 'string' ? polishedDraft.fullVoiceover.trim() : ''
-  const draftScenes = Array.isArray(polishedDraft?.scenes)
-    ? polishedDraft.scenes
-        .map((scene: any) => String(scene?.voiceover || '').trim())
-        .filter(Boolean)
-    : []
-
-  const polishPrompt = `Polish this voiceover for clarity and conversion while keeping it compliant.
-
-Requirements:
-- Keep meaning and compliance intact.
-- Keep 25-35 second spoken length.
-- Keep the final script between ${minWords} and ${maxWords} words.
-- Improve hook strength, specificity, and CTA clarity.
-- Remove fluff and repetition.
-- Output only the revised spoken voiceover.
-
-Draft:
-${draftFullVoiceover || draft}`
-
-  const polishedResponse = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    messages: [{ role: 'user', content: polishPrompt }],
-    temperature: 0.35,
-    max_tokens: 260,
-  })
-  const polished = polishedResponse.choices[0]?.message?.content?.trim() || draftFullVoiceover || draft
-  const polishedWordCount = countWords(polished)
-  if (polishedWordCount >= minWords && polishedWordCount <= maxWords) {
+  const parsed = parseJson(response.choices[0]?.message?.content?.trim() || '')
+  if (parsed?.scenes?.length) {
+    const scenes = parsed.scenes.slice(0, 5).map((scene: any, index: number) => ({
+      name: String(scene?.name || baseScenes[index]?.name || `scene-${index + 1}`),
+      seconds: Number(scene?.seconds || baseScenes[index]?.seconds || 6),
+      voiceover: String(scene?.voiceover || '').trim(),
+      brollQueries: [String(scene?.brollQuery || baseScenes[index]?.brollQuery || (baseScenes[index]?.brollQueries || product.brollQueries || [product.category])[0] || product.category)],
+      useProductImage: index === 1 || index === 4,
+    }))
     return {
-      fullVoiceover: polished || product.description,
-      sceneVoiceovers: draftScenes.length === sceneCount ? draftScenes : splitScriptIntoScenes(polished || product.description, sceneCount),
+      fullVoiceover: String(parsed?.fullVoiceover || scenes.map((scene: CreativeScene) => scene.voiceover || '').join(' ').trim() || product.description),
+      scenes,
     }
   }
 
-  const compressPrompt = `Rewrite the voiceover to ${minWords}-${maxWords} words while preserving the same offer, compliance, and CTA.
-
-Rules:
-- Stay natural and conversational.
-- Keep one clear hook, one clear mechanism, one clear CTA.
-- No exaggerated or prohibited claims.
-- Output only the final voiceover text.
-
-Voiceover:
-${polished}`
-
-  const compressedResponse = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    messages: [{ role: 'user', content: compressPrompt }],
-    temperature: 0.25,
-    max_tokens: 220,
-  })
-
-  const compressed = compressedResponse.choices[0]?.message?.content?.trim() || polished
-  const sceneVoiceovers = draftScenes.length === sceneCount ? draftScenes : splitScriptIntoScenes(compressed || draftFullVoiceover || draft || product.description, sceneCount)
+  const fallback = baseScenes.map((scene, index) => ({
+    ...scene,
+    voiceover: index === 0 && preferredHook
+      ? `${preferredHook} ${product.description}`
+      : product.description,
+  }))
   return {
-    fullVoiceover: compressed || draftFullVoiceover || draft || product.description,
-    sceneVoiceovers,
+    fullVoiceover: fallback.map((scene) => scene.voiceover || '').join(' ').trim(),
+    scenes: fallback,
   }
 }
 
-function fallbackScenesForScript(product: Product, sceneCount: number) {
-  const scenes = fallbackScenes(product, { scenes: [], hooks: [], cta: '' } as any)
-  return scenes.slice(0, Math.max(1, sceneCount)).map((scene, index) => ({
-    ...scene,
-    voiceover: scene.voiceover || `${product.name} helps support healthier soil and a better-looking result.`,
-  }))
+function productBrollAnchor(product: Product): string {
+  const text = `${product.name} ${product.category} ${(product.keywords || []).join(' ')}`.toLowerCase()
+  if (/pasture|hay|horse|cattle|farm|field/.test(text)) return 'pasture grass field'
+  if (/dog|urine|pet|lawn/.test(text)) return 'backyard lawn grass'
+  if (/compost|biochar|worm|raised bed|container/.test(text)) return 'garden soil compost'
+  return 'lawn and garden soil'
 }
 
-async function findPexelsVideo(product: Product): Promise<string> {
+function sanitizeBrollQuery(rawQuery: string, product: Product): string {
+  const input = String(rawQuery || '').trim().toLowerCase()
+  if (!input) return productBrollAnchor(product)
+
+  let query = input
+  for (const term of BROLL_BLOCKED_TERMS) {
+    query = query.replace(new RegExp(`\\b${term}\\b`, 'gi'), ' ')
+  }
+  query = query.replace(/\s+/g, ' ').trim()
+
+  const anchor = productBrollAnchor(product)
+  const hasLandContext = /lawn|garden|soil|yard|grass|root|compost|pasture|field|plant|fertilizer|spray|watering/.test(query)
+  if (!hasLandContext) query = `${query} ${anchor}`.trim()
+
+  if (query.length < 8) query = anchor
+  return query
+}
+
+function queryTokenSet(value: string): Set<string> {
+  return new Set(
+    String(value || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/g)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3)
+  )
+}
+
+function querySimilarity(a: string, b: string): number {
+  const left = queryTokenSet(a)
+  const right = queryTokenSet(b)
+  if (!left.size && !right.size) return 1
+  if (!left.size || !right.size) return 0
+  let overlap = 0
+  for (const token of left) {
+    if (right.has(token)) overlap++
+  }
+  return overlap / Math.max(left.size, right.size)
+}
+
+async function findPexelsVideo(queries: string[], product: Product): Promise<string> {
   const apiKey = process.env.PEXELS_API_KEY
   if (!apiKey) return ''
-  const queries = product.brollQueries?.length ? product.brollQueries : [product.category, product.name]
-  const query = queries[Math.floor(Date.now() / 3600000) % queries.length]
-  const response = await axios.get('https://api.pexels.com/videos/search', {
-    headers: { Authorization: apiKey },
-    params: { query, orientation: 'portrait', per_page: 10 },
-    timeout: 30000,
-  })
-  const video = response.data?.videos?.[0]
-  const files = video?.video_files || []
-
-  const qualityScore = (quality: string): number => {
-    const q = String(quality || '').toLowerCase()
-    if (q.includes('uhd') || q.includes('4k')) return 4
-    if (q.includes('hd') || q.includes('full')) return 3
-    if (q.includes('sd')) return 1
-    return 2
-  }
-
-  const area = (file: any): number => Number(file.width || 0) * Number(file.height || 0)
-  const portraitFiles = files.filter((file: any) => Number(file.height || 0) > Number(file.width || 0))
-  const candidates = portraitFiles.length ? portraitFiles : files
-
-  const best = [...candidates].sort((a: any, b: any) => {
-    const scoreA = qualityScore(a.quality) * 100000000 + area(a)
-    const scoreB = qualityScore(b.quality) * 100000000 + area(b)
-    return scoreB - scoreA
-  })[0]
-
-  const url = best?.link || ''
-  log('Selected Pexels b-roll', {
-    query,
-    videoId: video?.id,
-    quality: best?.quality || 'unknown',
-    width: best?.width || 0,
-    height: best?.height || 0,
-    url: url ? 'selected' : 'none',
-  })
-  return url
-}
-
-function sceneBrollQueries(product: Product): string[] {
-  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
-  const base = [
-    ...(product.brollQueries || []),
-    ...(product.keywords || []),
-    product.category,
-    product.name,
-  ]
-
-  const themeQueries = /dog|urine|pet/.test(name)
-    ? [
-        'watering lawn with hose',
-        'green grass roots close up',
-        'healthy lawn soil close up',
-        'garden hose watering grass',
-        'lawn care soil amendment',
-        'lush backyard lawn close up',
-      ]
-    : /compost|biochar|worm|living/.test(name)
-      ? [
-          'hands mixing compost and soil',
-          'rich compost soil close up',
-          'raised bed vegetable garden',
-          'mulching garden bed',
-          'seedlings in rich soil',
-          'gardening hands soil close up',
-        ]
-      : /pasture|hay|field/.test(name)
-        ? [
-            'green pasture grass close up',
-            'farm field watering grass',
-            'healthy field soil close up',
-            'cattle grazing pasture',
-            'lush grass field sunrise',
-            'hands checking soil in field',
-          ]
-        : [
-            'healthy soil close up',
-            'watering vegetable garden',
-            'garden soil being prepared',
-            'mulching flower bed',
-            'seedlings in garden bed',
-            'hands working in soil',
-          ]
-
-  const queries = [...themeQueries, ...base].map((query) => String(query).trim()).filter(Boolean)
-  return [...new Set(queries)]
-}
-
-type SceneTheme = {
-  label: string
-  scriptGoal: string
-  queryHints: string[]
-}
-
-function sceneThemes(product: Product): SceneTheme[] {
-  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
-
-  const soilTheme: SceneTheme = {
-    label: 'soil close-up',
-    scriptGoal: 'Show the soil problem and make the viewer feel the pain immediately.',
-    queryHints: [
-      'healthy soil close up',
-      'rich compost soil close up',
-      'soil texture macro',
-      'garden soil being prepared',
-      'hands working in soil',
-    ],
-  }
-
-  const wateringTheme: SceneTheme = {
-    label: 'watering and gardening',
-    scriptGoal: 'Show simple action and care with watering, feeding, or garden maintenance.',
-    queryHints: [
-      'watering vegetable garden',
-      'watering lawn with hose',
-      'garden hose watering grass',
-      'mulching garden bed',
-      'gardening hands soil close up',
-    ],
-  }
-
-  const growthTheme: SceneTheme = {
-    label: 'plant and lawn growth',
-    scriptGoal: 'Show the healthy-looking result or the kind of growth the product supports.',
-    queryHints: [
-      'seedlings in rich soil',
-      'green grass roots close up',
-      'lush backyard lawn close up',
-      'raised bed vegetable garden',
-      'healthy lawn roots close up',
-    ],
-  }
-
-  const ctaTheme: SceneTheme = {
-    label: 'final CTA shot',
-    scriptGoal: 'Close with a direct call to action and a clean product-forward finish.',
-    queryHints: [
-      'product on garden table',
-      'hands holding garden product',
-      'lawn care product close up',
-      'gardener looking at lawn',
-      'healthy garden close up',
-    ],
-  }
-
-  const specific: SceneTheme[] = /dog|urine|pet/.test(name)
-    ? [
-        soilTheme,
-        {
-          ...wateringTheme,
-          queryHints: ['watering lawn with hose', 'garden hose watering grass', 'green grass roots close up', 'healthy lawn soil close up'],
-        },
-        {
-          ...growthTheme,
-          queryHints: ['lush backyard lawn close up', 'healthy lawn roots close up', 'green grass close up', 'lawn after watering'],
-        },
-        ctaTheme,
-      ]
-    : /compost|biochar|worm|living/.test(name)
-      ? [
-          {
-            ...soilTheme,
-            queryHints: ['hands mixing compost and soil', 'rich compost soil close up', 'worm castings compost', 'garden soil being prepared'],
-          },
-          wateringTheme,
-          {
-            ...growthTheme,
-            queryHints: ['raised bed vegetable garden', 'seedlings in rich soil', 'plant roots in rich soil', 'healthy garden bed'],
-          },
-          ctaTheme,
-        ]
-      : /pasture|hay|field/.test(name)
-        ? [
-            {
-              ...soilTheme,
-              queryHints: ['healthy field soil close up', 'farm field soil close up', 'hands checking soil in field', 'green pasture soil close up'],
-            },
-            {
-              ...wateringTheme,
-              queryHints: ['farm field watering grass', 'watering pasture field', 'green pasture grass close up', 'lawn irrigation field'],
-            },
-            {
-              ...growthTheme,
-              queryHints: ['green pasture grass close up', 'lush grass field sunrise', 'cattle grazing pasture', 'healthy pasture field'],
-            },
-            ctaTheme,
-          ]
-        : [soilTheme, wateringTheme, growthTheme, ctaTheme]
-
-  return specific
-}
-
-function avatarTheme(product: Product): 'dog-owner' | 'gardener' | 'farmer' | 'homeowner' {
-  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
-  if (/dog|urine|pet/.test(name)) return 'dog-owner'
-  if (/pasture|hay|field|farm/.test(name)) return 'farmer'
-  if (/compost|biochar|worm|living|soil|garden|humic|seaweed/.test(name)) return 'gardener'
-  return 'homeowner'
-}
-
-function educationTopicForProduct(product: Product): 'pasture' | 'garden' | 'lawn' {
-  const name = `${product.name} ${product.category} ${product.description}`.toLowerCase()
-  if (/pasture|hay|field|farm|cattle|goat|forage|bermuda grass pasture/.test(name)) return 'pasture'
-  if (/compost|biochar|worm|raised bed|vegetable|fruit tree|homestead|organic/.test(name)) return 'garden'
-  return 'lawn'
-}
-
-function resolveFacebookGroupRoutes(product: Product): FacebookGroupRoute[] {
-  const topic = educationTopicForProduct(product)
-  const routes = loadFacebookGroupRoutes()
-  if (!routes.length) return []
-
-  return routes.filter((route) => {
-    const topics = (route.topics || []).map((value) => String(value).toLowerCase())
-    return topics.length === 0 || topics.includes(topic)
-  })
-}
-
-function avatarProfile(product: Product) {
-  const creativeProfiles = loadCreativeProfiles()
-  const creative = {
-    ...(creativeProfiles.defaults || {}),
-    ...((creativeProfiles.profiles || {})[product.id] || {}),
-  }
-
-  const theme = avatarTheme(product)
-  const profiles = {
-    'dog-owner': {
-      avatarId: process.env.HEYGEN_AVATAR_DOG_OWNER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
-      voiceId: process.env.HEYGEN_VOICE_DOG_OWNER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
-      scale: Number(process.env.HEYGEN_AVATAR_SCALE_DOG_OWNER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.47),
-      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_DOG_OWNER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.1),
-    },
-    gardener: {
-      avatarId: process.env.HEYGEN_AVATAR_GARDENER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
-      voiceId: process.env.HEYGEN_VOICE_GARDENER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
-      scale: Number(process.env.HEYGEN_AVATAR_SCALE_GARDENER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.45),
-      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_GARDENER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.12),
-    },
-    farmer: {
-      avatarId: process.env.HEYGEN_AVATAR_FARMER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
-      voiceId: process.env.HEYGEN_VOICE_FARMER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
-      scale: Number(process.env.HEYGEN_AVATAR_SCALE_FARMER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.46),
-      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_FARMER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.12),
-    },
-    homeowner: {
-      avatarId: process.env.HEYGEN_AVATAR_HOMEOWNER || creative.avatarId || process.env.HEYGEN_DEFAULT_AVATAR,
-      voiceId: process.env.HEYGEN_VOICE_HOMEOWNER || creative.voiceId || process.env.HEYGEN_DEFAULT_VOICE,
-      scale: Number(process.env.HEYGEN_AVATAR_SCALE_HOMEOWNER || creative.avatarScale || process.env.HEYGEN_AVATAR_SCALE || 0.48),
-      offsetY: Number(process.env.HEYGEN_AVATAR_OFFSET_Y_HOMEOWNER || creative.avatarOffsetY || process.env.HEYGEN_AVATAR_OFFSET_Y || 0.1),
-    },
-  } as const
-
-  const profile = profiles[theme]
-  return {
-    theme,
-    avatar_id: profile.avatarId || 'Daisy-inskirt-20220818',
-    voice_id: profile.voiceId || '2d5b0e6cf36f460aa7fc47e3eee4ba54',
-    scale: profile.scale,
-    offsetY: profile.offsetY,
-  }
-}
-
-function splitScriptIntoScenes(script: string, sceneCount: number): string[] {
-  const text = (script || '').trim()
-  if (!text) return ['']
-
-  const normalizedSceneCount = Math.max(1, sceneCount)
-  if (normalizedSceneCount === 1) return [text]
-
-  const sentences = text
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
+  const inputOptions = queries.length ? queries : ['healthy soil close up']
+  const options = inputOptions
+    .map((originalQuery) => {
+      const sanitizedQuery = sanitizeBrollQuery(originalQuery, product)
+      if (STRICT_BROLL_QUERY_QA) {
+        const similarity = querySimilarity(originalQuery, sanitizedQuery)
+        if (String(originalQuery || '').trim() && similarity < 0.35) {
+          throw new Error(`B-roll QA rejected query for ${product.id}: "${originalQuery}" -> "${sanitizedQuery}"`)
+        }
+      }
+      return sanitizedQuery
+    })
     .filter(Boolean)
 
-  if (sentences.length <= 1) return [text]
-
-  const chunks: string[] = Array.from({ length: normalizedSceneCount }, () => '')
-  const wordsByChunk: number[] = Array.from({ length: normalizedSceneCount }, () => 0)
-
-  for (const sentence of sentences) {
-    const words = sentence.split(/\s+/).filter(Boolean).length
-    let targetIndex = 0
-    for (let i = 1; i < wordsByChunk.length; i++) {
-      if (wordsByChunk[i] < wordsByChunk[targetIndex]) targetIndex = i
-    }
-
-    chunks[targetIndex] = chunks[targetIndex] ? `${chunks[targetIndex]} ${sentence}` : sentence
-    wordsByChunk[targetIndex] += words
+  for (const query of options.slice(0, 3)) {
+    const response = await axios.get('https://api.pexels.com/videos/search', {
+      headers: { Authorization: apiKey },
+      params: { query, orientation: 'portrait', per_page: 8 },
+      timeout: 30000,
+    })
+    const videos = Array.isArray(response.data?.videos) ? response.data.videos : []
+    const video = videos[0]
+    const files = video?.video_files || []
+    const portrait = files.find((file: any) => Number(file.height || 0) > Number(file.width || 0))
+    const sd = files.find((file: any) => file.quality === 'sd')
+    const url = portrait?.link || sd?.link || files[0]?.link || ''
+    log('Selected Pexels b-roll', { query, videoId: video?.id, url: url ? 'selected' : 'none' })
+    if (url) return url
   }
 
-  const nonEmpty = chunks.map((s) => s.trim()).filter(Boolean)
-  return nonEmpty.length ? nonEmpty : [text]
+  return ''
 }
 
-function normalizeSceneVoiceovers(sceneVoiceovers: string[], sceneCount: number, fallbackScript: string): string[] {
-  const normalizedSceneCount = Math.max(1, sceneCount)
-  const trimmed = sceneVoiceovers.map((scene) => String(scene || '').trim()).filter(Boolean)
-  const base = trimmed.length >= normalizedSceneCount
-    ? trimmed.slice(0, normalizedSceneCount)
-    : splitScriptIntoScenes(fallbackScript, normalizedSceneCount)
-
-  if (!base.length) return [fallbackScript || '']
-
-  while (base.length < normalizedSceneCount) {
-    base.push(base[base.length - 1])
-  }
-
-  return base.slice(0, normalizedSceneCount)
-}
-
-async function findPexelsVideos(product: Product, sceneCount: number): Promise<string[]> {
-  const themes = sceneThemes(product)
-  const count = Math.max(1, sceneCount)
-  const urls: string[] = []
-
-  for (let i = 0; i < count; i++) {
-    const theme = themes[i] || themes[themes.length - 1]
-    const queries = [...theme.queryHints, ...sceneBrollQueries(product)]
-    const query = queries[i % queries.length] || product.category || product.name
-    const tempProduct: Product = { ...product, brollQueries: [query] }
-    const url = await findPexelsVideo(tempProduct)
-    if (url) urls.push(url)
-  }
-
-  return urls
-}
-
-function avatarSettings(product: Product) {
-  const profile = avatarProfile(product)
+function avatarSettings(profile: CreativeProfile) {
+  const scale = Number(process.env.HEYGEN_AVATAR_SCALE || profile.avatarScale || 0.46)
+  const offsetY = Number(process.env.HEYGEN_AVATAR_OFFSET_Y || profile.avatarOffsetY || 0.18)
   return {
-    avatar_id: profile.avatar_id,
-    voice_id: profile.voice_id,
-    scale: profile.scale,
-    offsetY: profile.offsetY,
-    theme: profile.theme,
+    avatar_id: profile.avatarId || process.env.HEYGEN_DEFAULT_AVATAR || 'Daisy-inskirt-20220818',
+    voice_id: profile.voiceId || process.env.HEYGEN_DEFAULT_VOICE || '2d5b0e6cf36f460aa7fc47e3eee4ba54',
+    scale,
+    offsetY,
   }
 }
 
-async function createHeyGenVideo(product: Product, sceneVoiceovers: string[], brollUrls: string[]): Promise<string> {
+async function createHeyGenVideo(product: Product, scenePlan: { fullVoiceover: string, scenes: CreativeScene[] }, profile: CreativeProfile): Promise<string> {
   const apiKey = process.env.HEYGEN_API_KEY
   if (!apiKey) throw new Error('Missing HEYGEN_API_KEY')
   const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
-  const avatar = avatarSettings(product)
+  const avatar = avatarSettings(profile)
 
-  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
-  const fallbackScript = sceneVoiceovers.join(' ').trim()
-  const scriptScenes = normalizeSceneVoiceovers(sceneVoiceovers, sceneCount, fallbackScript)
-  const sceneBackgrounds = scriptScenes.map((_, index) => brollUrls[index] || brollUrls[0] || '')
+  const scenes = scenePlan.scenes.length ? scenePlan.scenes : fallbackScenes(product, profile)
+  const videoInputs = []
+  for (let index = 0; index < scenes.length; index++) {
+    const scene = scenes[index]
+    const queries = scene.brollQueries?.length
+      ? scene.brollQueries
+      : [scene.brollQuery || product.category]
+    const brollUrl = await findPexelsVideo(queries, product)
 
-  const videoInputs = scriptScenes.map((sceneScript, index) => {
-    const background = sceneBackgrounds[index]
-      ? { type: 'video', url: sceneBackgrounds[index], play_style: 'fit_to_scene' }
-      : { type: 'color', value: '#0a3d0a' }
+    const isProductImageSlot = index === 1 || index === 4
+    const useProductImage = !!(product.productImageUrl && isProductImageSlot && scene.useProductImage !== false)
+    const background = useProductImage
+      ? { type: 'image', url: product.productImageUrl }
+      : brollUrl
+        ? { type: 'video', url: brollUrl, play_style: 'fit_to_scene' }
+        : { type: 'color', value: '#0a3d0a' }
 
-    return {
+    const sceneVoice = (scene.voiceover || '').trim() || product.description
+    videoInputs.push({
       character: {
         type: 'avatar',
         avatar_id: avatar.avatar_id,
@@ -786,13 +487,13 @@ async function createHeyGenVideo(product: Product, sceneVoiceovers: string[], br
       },
       voice: {
         type: 'text',
-        input_text: sceneScript,
+        input_text: sceneVoice,
         voice_id: avatar.voice_id,
         speed: 1.0,
       },
       background,
-    }
-  })
+    })
+  }
 
   const body = {
     video_inputs: videoInputs,
@@ -807,7 +508,7 @@ async function createHeyGenVideo(product: Product, sceneVoiceovers: string[], br
 
   const videoId = response.data?.data?.video_id || response.data?.video_id
   if (!videoId) throw new Error('HeyGen did not return video_id')
-  log('HeyGen video job created', { videoId, avatarScale: avatar.scale, avatarTheme: avatar.theme, scenes: videoInputs.length })
+  log('HeyGen video job created', { videoId, avatarScale: avatar.scale, scenes: videoInputs.length, hasProductImage: !!product.productImageUrl })
   return videoId
 }
 
@@ -917,95 +618,39 @@ async function postToInstagram(videoUrl: string, captionText: string): Promise<s
   return mediaId
 }
 
-async function postToFacebook(videoUrl: string, title: string, captionText: string): Promise<string> {
-  const pageAccessToken = pickEnv(['FB_PAGE_ACCESS_TOKEN', 'FACEBOOK_PAGE_ACCESS_TOKEN'])
-  const pageId = pickEnv(['FB_PAGE_ID', 'FACEBOOK_PAGE_ID'])
-  if (!pageAccessToken || !pageId) throw new Error('Missing Facebook Page access token or Page ID')
-
-  const apiVersion = process.env.FACEBOOK_API_VERSION || 'v20.0'
-  const host = process.env.FACEBOOK_API_HOST || 'graph.facebook.com'
-  const baseUrl = `https://${host}/${apiVersion}`
-
-  const body = new URLSearchParams({
-    access_token: pageAccessToken,
-    file_url: videoUrl,
-    title: title.slice(0, 95),
-    description: captionText,
-    published: 'true',
-  })
-
-  const response = await axios.post(`${baseUrl}/${pageId}/videos`, body.toString(), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    timeout: 180000,
-  })
-
-  const postId = response.data?.id || ''
-  if (!postId) throw new Error('Facebook video publish did not return id')
-  return postId
-}
-
-async function postToFacebookGroup(videoUrl: string, title: string, captionText: string, groupId: string): Promise<string> {
-  const allowedGroupIds = loadFacebookGroupAllowlist()
-  if (allowedGroupIds.size === 0) throw new Error('No Facebook group allowlist configured')
-  if (!allowedGroupIds.has(groupId)) throw new Error(`Facebook group ${groupId} is not in the allowlist`)
-
-  const groupAccessToken = pickEnv(['FB_GROUP_ACCESS_TOKEN', 'FACEBOOK_GROUP_ACCESS_TOKEN', 'FB_PAGE_ACCESS_TOKEN', 'FACEBOOK_PAGE_ACCESS_TOKEN'])
-  if (!groupAccessToken) throw new Error('Missing Facebook group access token')
-
-  const apiVersion = process.env.FACEBOOK_API_VERSION || 'v20.0'
-  const host = process.env.FACEBOOK_API_HOST || 'graph.facebook.com'
-  const baseUrl = `https://${host}/${apiVersion}`
-
-  const body = new URLSearchParams({
-    access_token: groupAccessToken,
-    file_url: videoUrl,
-    title: title.slice(0, 95),
-    description: captionText,
-    published: 'true',
-  })
-
-  const response = await axios.post(`${baseUrl}/${groupId}/videos`, body.toString(), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    timeout: 180000,
-  })
-
-  const postId = response.data?.id || ''
-  if (!postId) throw new Error(`Facebook group ${groupId} publish did not return id`)
-  return postId
-}
-
 async function main() {
   await loadSecrets()
-  assertRequiredSecrets()
 
   const products = loadProducts()
   if (!products.length) throw new Error('No products configured')
   const { product, variationIndex, variationCount } = pickProduct(products)
+  const profile = productCreativeProfile(product)
 
   log('Scheduled product selected', { product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
-
-  const scriptBundle = await generateScript(product, variationIndex, variationCount)
-  const script = scriptBundle.fullVoiceover
-  const scriptWordCount = script.trim().split(/\s+/).filter(Boolean).length
-  log('Generated script', {
-    length: script.length,
-    words: scriptWordCount,
-    preview: script.replace(/\s+/g, ' ').trim().slice(0, 240),
+  log('Creative mapping selected', {
+    avatar: profile.avatarId || process.env.HEYGEN_DEFAULT_AVATAR || 'default',
+    voice: profile.voiceId || process.env.HEYGEN_DEFAULT_VOICE || 'default',
+    hasScenePlan: !!profile.scenes?.length,
+    hasProductImage: !!product.productImageUrl,
   })
 
-  const sceneCount = Math.max(1, Number(process.env.HEYGEN_SCENE_COUNT || 4))
-  const brollUrls = await findPexelsVideos(product, sceneCount)
-  log('Selected b-roll scenes', {
-    requestedScenes: sceneCount,
-    selected: brollUrls.length,
-    themes: sceneThemes(product).slice(0, sceneCount).map((theme) => theme.label),
+  const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount)
+  log('Generated scene plan', {
+    fullVoiceoverLength: scenePlan.fullVoiceover.length,
+    scenes: scenePlan.scenes.map((scene, index) => ({
+      idx: index + 1,
+      name: scene.name,
+      seconds: scene.seconds,
+      useProductImage: !!scene.useProductImage,
+    })),
   })
-  const videoId = await createHeyGenVideo(product, scriptBundle.sceneVoiceovers, brollUrls)
+
+  const videoId = await createHeyGenVideo(product, scenePlan, profile)
   const videoUrl = await pollHeyGen(videoId)
   log('Finished video URL', { videoUrl })
 
-  const captionText = caption(product, script)
-  const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook')
+  const captionText = caption(product, scenePlan.fullVoiceover)
+  const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram')
     .toLowerCase()
     .split(',')
     .map((p) => p.trim())
@@ -1034,72 +679,6 @@ async function main() {
       log('Posted to Instagram', { id })
     } catch (error: any) {
       log('Instagram post failed', error?.message || error)
-    }
-  }
-
-  if (platforms.includes('facebook')) {
-    try {
-      const id = await postToFacebook(videoUrl, product.name, captionText)
-      posted++
-      log('Posted to Facebook', { id })
-    } catch (error: any) {
-      log('Facebook post failed', error?.message || error)
-    }
-
-    const groupIds = parseIdList(pickEnv(['FB_GROUP_IDS', 'FACEBOOK_GROUP_IDS']))
-    const allowedGroupIds = loadFacebookGroupAllowlist()
-    const approvedGroupIds = groupIds.filter((groupId) => allowedGroupIds.has(groupId))
-    const routedGroups = resolveFacebookGroupRoutes(product)
-
-    if (groupIds.length > 0 && allowedGroupIds.size > 0) {
-      const skippedGroupIds = groupIds.filter((groupId) => !allowedGroupIds.has(groupId))
-      if (skippedGroupIds.length > 0) {
-        log('Skipping unapproved Facebook group IDs', { skippedGroupIds })
-      }
-
-      for (const groupId of approvedGroupIds) {
-        try {
-          const id = await postToFacebookGroup(videoUrl, product.name, captionText, groupId)
-          posted++
-          log('Posted to Facebook group', { groupId, id })
-        } catch (error: any) {
-          log('Facebook group post failed', { groupId, error: error?.message || error })
-        }
-      }
-      if (approvedGroupIds.length === 0) {
-        log('No configured Facebook group IDs matched the allowlist')
-      }
-    } else {
-      log('No Facebook group allowlist or group IDs configured; skipping group posts')
-    }
-
-    if (routedGroups.length > 0) {
-      const routedGroupIds = routedGroups
-        .map((route) => route.groupId || '')
-        .map((groupId) => groupId.trim())
-        .filter(Boolean)
-
-      if (routedGroupIds.length === 0) {
-        log('Facebook educational group routes configured but no group IDs are set yet', {
-          routes: routedGroups.map((route) => route.label),
-          topic: educationTopicForProduct(product),
-        })
-      } else {
-        const dedupedGroupIds = [...new Set(routedGroupIds)]
-        for (const groupId of dedupedGroupIds) {
-          if (!allowedGroupIds.has(groupId)) {
-            log('Skipping unrouted Facebook group because it is not allowlisted', { groupId })
-            continue
-          }
-          try {
-            const id = await postToFacebookGroup(videoUrl, product.name, captionText, groupId)
-            posted++
-            log('Posted to routed Facebook group', { groupId, id, topic: educationTopicForProduct(product) })
-          } catch (error: any) {
-            log('Routed Facebook group post failed', { groupId, error: error?.message || error })
-          }
-        }
-      }
     }
   }
 
