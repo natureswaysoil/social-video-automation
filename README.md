@@ -8,9 +8,10 @@ This repo is separate from `natureswaysoil/video` so daily posting does not conf
 
 - Rotates through the top 5 Nature's Way Soil products
 - Generates a fresh 25-35 second script with OpenAI
-- Pulls portrait B-roll from Pexels when available
-- Creates a vertical HeyGen video
-- Polls until the HeyGen MP4 is ready
+- Assigns a product-specific DiD avatar role (dog owner, gardener, farmer, homeowner)
+- Pulls portrait B-roll backgrounds from Pexels when available
+- Creates a vertical DiD clip
+- Polls until the DiD MP4 is ready
 - Posts to YouTube and Instagram when credentials are configured
 - Runs 5 scheduled slots per day through GitHub Actions
 
@@ -105,7 +106,7 @@ Minimum required:
 
 ```text
 OPENAI_API_KEY
-HEYGEN_API_KEY
+DID_API_KEY
 PEXELS_API_KEY
 ```
 
@@ -149,8 +150,14 @@ VARIATIONS_PER_PRODUCT=5
 ENABLE_PLATFORMS=youtube,instagram
 YT_PRIVACY_STATUS=public
 DRY_RUN_LOG_ONLY=false
-HEYGEN_AVATAR_SCALE=0.52
-HEYGEN_AVATAR_OFFSET_Y=0.12
+DID_DEFAULT_AVATAR=v2_public_Amber@0zSz8kflCN
+DID_DEFAULT_VOICE=en-US-AvaNeural
+DID_AVATAR_DOG_OWNER=v2_public_Amber@0zSz8kflCN
+DID_AVATAR_GARDENER=v2_public_Amber@0zSz8kflCN
+DID_AVATAR_FARMER=v2_public_Adam@0GLJgELXjc
+DID_AVATAR_HOMEOWNER=v2_public_Amber@0zSz8kflCN
+DID_POLL_TIMEOUT_MS=1500000
+DID_POLL_INTERVAL_MS=15000
 ```
 
 ## Important

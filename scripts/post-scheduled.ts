@@ -36,6 +36,9 @@ type CreativeScene = {
 type CreativeProfile = {
   avatarId?: string
   voiceId?: string
+  didAvatarId?: string
+  didVoiceId?: string
+  didAvatarRole?: string
   avatarScale?: number
   avatarOffsetY?: number
   audience?: string
@@ -51,6 +54,12 @@ type CreativeProfilesFile = {
   profiles?: Record<string, CreativeProfile>
 }
 
+type DidAvatarSelection = {
+  avatarId: string
+  voiceId: string
+  role: string
+}
+
 const ROOT = process.cwd()
 const CONFIG_PATH = path.resolve(ROOT, 'config/top-products.json')
 const STATE_PATH = path.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json')
@@ -62,12 +71,21 @@ const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
   'OPENAI_MODEL',
-  'HEYGEN_API_KEY',
-  'HEYGEN_API_ENDPOINT',
-  'HEYGEN_DEFAULT_AVATAR',
-  'HEYGEN_DEFAULT_VOICE',
-  'HEYGEN_AVATAR_SCALE',
-  'HEYGEN_AVATAR_OFFSET_Y',
+  'DID_API_KEY',
+  'DID_API_ENDPOINT',
+  'DID_DEFAULT_AVATAR',
+  'DID_DEFAULT_VOICE',
+  'DID_VOICE_PROVIDER',
+  'DID_AVATAR_DOG_OWNER',
+  'DID_AVATAR_GARDENER',
+  'DID_AVATAR_FARMER',
+  'DID_AVATAR_HOMEOWNER',
+  'DID_VOICE_DOG_OWNER',
+  'DID_VOICE_GARDENER',
+  'DID_VOICE_FARMER',
+  'DID_VOICE_HOMEOWNER',
+  'DID_POLL_TIMEOUT_MS',
+  'DID_POLL_INTERVAL_MS',
   'PEXELS_API_KEY',
   'YT_CLIENT_ID',
   'YT_CLIENT_SECRET',
@@ -79,7 +97,30 @@ const SECRET_NAMES = [
   'INSTAGRAM_IG_ID',
   'INSTAGRAM_USER_ID',
   'INSTAGRAM_ACCOUNT_ID',
+  // Backward compatibility aliases
+  'HEYGEN_API_KEY',
+  'HEYGEN_API_ENDPOINT',
+  'HEYGEN_DEFAULT_AVATAR',
+  'HEYGEN_DEFAULT_VOICE',
+  'HEYGEN_AVATAR_DOG_OWNER',
+  'HEYGEN_AVATAR_GARDENER',
+  'HEYGEN_AVATAR_FARMER',
+  'HEYGEN_AVATAR_HOMEOWNER',
 ]
+
+const DEFAULT_DID_AVATAR_BY_ROLE: Record<string, string> = {
+  DOG_OWNER: 'v2_public_Amber@0zSz8kflCN',
+  GARDENER: 'v2_public_Amber@0zSz8kflCN',
+  HOMEOWNER: 'v2_public_Amber@0zSz8kflCN',
+  FARMER: 'v2_public_Adam@0GLJgELXjc',
+}
+
+const DEFAULT_DID_VOICE_BY_ROLE: Record<string, string> = {
+  DOG_OWNER: 'en-US-JennyNeural',
+  GARDENER: 'en-US-AriaNeural',
+  HOMEOWNER: 'en-US-AvaNeural',
+  FARMER: 'en-US-GuyNeural',
+}
 
 const BROLL_BLOCKED_TERMS = [
   'ocean',
@@ -120,6 +161,14 @@ function hasValue(name: string): boolean {
   return normalized !== '' && !placeholders.some((token) => normalized.includes(token))
 }
 
+function pickEnv(keys: string[]): string {
+  for (const key of keys) {
+    const value = process.env[key]?.trim()
+    if (value) return value
+  }
+  return ''
+}
+
 function secretCandidates(name: string): string[] {
   const upper = name.trim().replace(/[\s-]+/g, '_').toUpperCase()
   const lowerHyphen = upper.toLowerCase().replace(/_/g, '-')
@@ -127,9 +176,24 @@ function secretCandidates(name: string): string[] {
   return [...new Set([upper, lowerHyphen, name, name.replace(/_/g, '-'), lowerUnderscore])]
 }
 
+function normalizeGeneratorEnv() {
+  if (!hasValue('DID_API_KEY') && hasValue('HEYGEN_API_KEY')) process.env.DID_API_KEY = process.env.HEYGEN_API_KEY
+  if (!hasValue('DID_API_ENDPOINT') && hasValue('HEYGEN_API_ENDPOINT')) process.env.DID_API_ENDPOINT = process.env.HEYGEN_API_ENDPOINT
+  if (!hasValue('DID_DEFAULT_AVATAR') && hasValue('HEYGEN_DEFAULT_AVATAR')) process.env.DID_DEFAULT_AVATAR = process.env.HEYGEN_DEFAULT_AVATAR
+  if (!hasValue('DID_DEFAULT_VOICE') && hasValue('HEYGEN_DEFAULT_VOICE')) process.env.DID_DEFAULT_VOICE = process.env.HEYGEN_DEFAULT_VOICE
+
+  if (!hasValue('DID_AVATAR_DOG_OWNER') && hasValue('HEYGEN_AVATAR_DOG_OWNER')) process.env.DID_AVATAR_DOG_OWNER = process.env.HEYGEN_AVATAR_DOG_OWNER
+  if (!hasValue('DID_AVATAR_GARDENER') && hasValue('HEYGEN_AVATAR_GARDENER')) process.env.DID_AVATAR_GARDENER = process.env.HEYGEN_AVATAR_GARDENER
+  if (!hasValue('DID_AVATAR_FARMER') && hasValue('HEYGEN_AVATAR_FARMER')) process.env.DID_AVATAR_FARMER = process.env.HEYGEN_AVATAR_FARMER
+  if (!hasValue('DID_AVATAR_HOMEOWNER') && hasValue('HEYGEN_AVATAR_HOMEOWNER')) process.env.DID_AVATAR_HOMEOWNER = process.env.HEYGEN_AVATAR_HOMEOWNER
+}
+
 async function loadSecrets() {
   const useSecretManager = String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() !== 'false'
-  if (!useSecretManager) return
+  if (!useSecretManager) {
+    normalizeGeneratorEnv()
+    return
+  }
 
   const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'natureswaysoil-video'
   const client = new SecretManagerServiceClient()
@@ -155,6 +219,8 @@ async function loadSecrets() {
       }
     }
   }
+
+  normalizeGeneratorEnv()
 }
 
 function loadProducts(): Product[] {
@@ -390,7 +456,7 @@ function queryTokenSet(value: string): Set<string> {
       .toLowerCase()
       .split(/[^a-z0-9]+/g)
       .map((token) => token.trim())
-      .filter((token) => token.length >= 3)
+      .filter((token) => token.length >= 3),
   )
 }
 
@@ -406,9 +472,10 @@ function querySimilarity(a: string, b: string): number {
   return overlap / Math.max(left.size, right.size)
 }
 
-async function findPexelsVideo(queries: string[], product: Product): Promise<string> {
+async function findPexelsBackgroundImage(queries: string[], product: Product): Promise<string> {
   const apiKey = process.env.PEXELS_API_KEY
   if (!apiKey) return ''
+
   const inputOptions = queries.length ? queries : ['healthy soil close up']
   const options = inputOptions
     .map((originalQuery) => {
@@ -424,130 +491,192 @@ async function findPexelsVideo(queries: string[], product: Product): Promise<str
     .filter(Boolean)
 
   for (const query of options.slice(0, 3)) {
-    const response = await axios.get('https://api.pexels.com/videos/search', {
+    const photoResponse = await axios.get('https://api.pexels.com/v1/search', {
       headers: { Authorization: apiKey },
-      params: { query, orientation: 'portrait', per_page: 8 },
+      params: { query, orientation: 'portrait', per_page: 15 },
       timeout: 30000,
     })
-    const videos = Array.isArray(response.data?.videos) ? response.data.videos : []
-    const video = videos[0]
-    const files = video?.video_files || []
-    const portrait = files.find((file: any) => Number(file.height || 0) > Number(file.width || 0))
-    const sd = files.find((file: any) => file.quality === 'sd')
-    const url = portrait?.link || sd?.link || files[0]?.link || ''
-    log('Selected Pexels b-roll', { query, videoId: video?.id, url: url ? 'selected' : 'none' })
-    if (url) return url
+    const photos = Array.isArray(photoResponse.data?.photos) ? photoResponse.data.photos : []
+    const photo = photos.find((item: any) => Number(item?.height || 0) > Number(item?.width || 0)) || photos[0]
+    const imageUrl = photo?.src?.portrait || photo?.src?.large2x || photo?.src?.large || photo?.src?.original || ''
+    if (imageUrl) {
+      log('Selected Pexels image b-roll', { query, photoId: photo?.id, selected: true })
+      return imageUrl
+    }
+
+    const videoResponse = await axios.get('https://api.pexels.com/videos/search', {
+      headers: { Authorization: apiKey },
+      params: { query, orientation: 'portrait', per_page: 6 },
+      timeout: 30000,
+    })
+    const videos = Array.isArray(videoResponse.data?.videos) ? videoResponse.data.videos : []
+    const stillImage = videos[0]?.image || ''
+    if (stillImage) {
+      log('Selected Pexels video thumbnail b-roll', { query, videoId: videos[0]?.id, selected: true })
+      return stillImage
+    }
   }
 
   return ''
 }
 
-function avatarSettings(profile: CreativeProfile) {
-  const scale = Number(process.env.HEYGEN_AVATAR_SCALE || profile.avatarScale || 0.46)
-  const offsetY = Number(process.env.HEYGEN_AVATAR_OFFSET_Y || profile.avatarOffsetY || 0.18)
-  return {
-    avatar_id: profile.avatarId || process.env.HEYGEN_DEFAULT_AVATAR || 'Daisy-inskirt-20220818',
-    voice_id: profile.voiceId || process.env.HEYGEN_DEFAULT_VOICE || '2d5b0e6cf36f460aa7fc47e3eee4ba54',
-    scale,
-    offsetY,
-  }
+function normalizeRole(input: string): string {
+  const value = String(input || '').trim().toUpperCase().replace(/[\s-]+/g, '_')
+  if (['DOG', 'PET', 'DOG_OWNER', 'PET_OWNER'].includes(value)) return 'DOG_OWNER'
+  if (['FARM', 'FARMER', 'PASTURE', 'RANCH', 'AG'].includes(value)) return 'FARMER'
+  if (['GARDEN', 'GARDENER', 'COMPOST', 'SOIL'].includes(value)) return 'GARDENER'
+  return value || 'HOMEOWNER'
 }
 
-async function createHeyGenVideo(product: Product, scenePlan: { fullVoiceover: string, scenes: CreativeScene[] }, profile: CreativeProfile): Promise<string> {
-  const apiKey = process.env.HEYGEN_API_KEY
-  if (!apiKey) throw new Error('Missing HEYGEN_API_KEY')
-  const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
-  const avatar = avatarSettings(profile)
+function inferAvatarRole(product: Product, profile: CreativeProfile): string {
+  if (profile.didAvatarRole) return normalizeRole(profile.didAvatarRole)
+
+  const byProductId: Record<string, string> = {
+    NWS_014: 'DOG_OWNER',
+    NWS_011: 'GARDENER',
+    NWS_013: 'GARDENER',
+    NWS_021: 'FARMER',
+    NWS_018: 'HOMEOWNER',
+  }
+  if (byProductId[product.id]) return byProductId[product.id]
+
+  const text = `${product.name} ${product.category} ${(product.keywords || []).join(' ')}`.toLowerCase()
+  if (/dog|pet|urine/.test(text)) return 'DOG_OWNER'
+  if (/pasture|hay|horse|cattle|farm|field/.test(text)) return 'FARMER'
+  if (/compost|biochar|garden|worm|raised bed|soil/.test(text)) return 'GARDENER'
+  return 'HOMEOWNER'
+}
+
+function didAuthorization(apiKey: string): string {
+  const value = String(apiKey || '').trim()
+  if (/^(basic|bearer)\s+/i.test(value)) return value
+  return `Basic ${value}`
+}
+
+function isLikelyDidAvatarId(value: string): boolean {
+  const v = String(value || '').trim()
+  if (!v) return false
+  return /^v2_/.test(v) || /^public_/.test(v) || /^pr_/.test(v) || /^avt_/.test(v) || v.includes('@')
+}
+
+function resolveDidAvatar(product: Product, profile: CreativeProfile): DidAvatarSelection {
+  const role = inferAvatarRole(product, profile)
+
+  const roleAvatar = pickEnv([
+    `DID_AVATAR_${role}`,
+    `DID_${role}_AVATAR`,
+  ])
+
+  const roleVoice = pickEnv([
+    `DID_VOICE_${role}`,
+    `DID_${role}_VOICE`,
+  ])
+
+  const explicitAvatar = String(profile.didAvatarId || '').trim()
+  const explicitVoice = String(profile.didVoiceId || '').trim()
+  const legacyAvatar = String(profile.avatarId || '').trim()
+  const legacyVoice = String(profile.voiceId || '').trim()
+
+  const avatarId = explicitAvatar
+    || roleAvatar
+    || (isLikelyDidAvatarId(legacyAvatar) ? legacyAvatar : '')
+    || pickEnv(['DID_DEFAULT_AVATAR'])
+    || DEFAULT_DID_AVATAR_BY_ROLE[role]
+    || DEFAULT_DID_AVATAR_BY_ROLE.HOMEOWNER
+
+  const voiceId = explicitVoice
+    || roleVoice
+    || legacyVoice
+    || pickEnv(['DID_DEFAULT_VOICE'])
+    || DEFAULT_DID_VOICE_BY_ROLE[role]
+    || DEFAULT_DID_VOICE_BY_ROLE.HOMEOWNER
+
+  return { avatarId, voiceId, role }
+}
+
+async function createDiDClip(product: Product, scenePlan: { fullVoiceover: string, scenes: CreativeScene[] }, profile: CreativeProfile): Promise<string> {
+  const apiKey = pickEnv(['DID_API_KEY'])
+  if (!apiKey) throw new Error('Missing DID_API_KEY')
+  const endpoint = (pickEnv(['DID_API_ENDPOINT']) || 'https://api.d-id.com').replace(/\/$/, '')
+  const avatar = resolveDidAvatar(product, profile)
+  const voiceProvider = pickEnv(['DID_VOICE_PROVIDER']) || 'microsoft'
 
   const scenes = scenePlan.scenes.length ? scenePlan.scenes : fallbackScenes(product, profile)
-  const videoInputs = []
-  for (let index = 0; index < scenes.length; index++) {
-    const scene = scenes[index]
-    const queries = scene.brollQueries?.length
-      ? scene.brollQueries
-      : [scene.brollQuery || product.category]
-    const brollUrl = await findPexelsVideo(queries, product)
+  const queryCandidates = scenes.flatMap((scene) => scene.brollQueries?.length ? scene.brollQueries : [scene.brollQuery || product.category])
+  const brollBackgroundUrl = await findPexelsBackgroundImage(queryCandidates, product)
 
-    const isProductImageSlot = index === 1 || index === 4
-    const useProductImage = !!(product.productImageUrl && isProductImageSlot && scene.useProductImage !== false)
-    const background = useProductImage
-      ? { type: 'image', url: product.productImageUrl }
-      : brollUrl
-        ? { type: 'video', url: brollUrl, play_style: 'fit_to_scene' }
-        : { type: 'color', value: '#0a3d0a' }
-
-    const sceneVoice = (scene.voiceover || '').trim() || product.description
-    videoInputs.push({
-      character: {
-        type: 'avatar',
-        avatar_id: avatar.avatar_id,
-        avatar_style: 'normal',
-        scale: avatar.scale,
-        offset: { x: 0, y: avatar.offsetY },
+  const body: any = {
+    presenter_id: avatar.avatarId,
+    script: {
+      type: 'text',
+      input: scenePlan.fullVoiceover || scenes.map((scene) => scene.voiceover || '').join(' ').trim() || product.description,
+      subtitles: false,
+      provider: {
+        type: voiceProvider,
+        voice_id: avatar.voiceId,
       },
-      voice: {
-        type: 'text',
-        input_text: sceneVoice,
-        voice_id: avatar.voice_id,
-        speed: 1.0,
-      },
-      background,
-    })
+    },
+    config: {
+      result_format: 'mp4',
+      output_resolution: Number(process.env.DID_OUTPUT_RESOLUTION || 1080),
+    },
+    name: product.name.slice(0, 120),
   }
 
-  const body = {
-    video_inputs: videoInputs,
-    dimension: { width: 720, height: 1280 },
-    title: product.name,
-  }
+  if (brollBackgroundUrl) body.background = { source_url: brollBackgroundUrl }
+  else if (product.productImageUrl) body.background = { source_url: product.productImageUrl }
+  else body.background = { color: '#0a3d0a' }
 
-  const response = await axios.post(`${endpoint}/v2/video/generate`, body, {
-    headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
+  const response = await axios.post(`${endpoint}/clips`, body, {
+    headers: {
+      Authorization: didAuthorization(apiKey),
+      'Content-Type': 'application/json',
+    },
     timeout: 120000,
   })
 
-  const videoId = response.data?.data?.video_id || response.data?.video_id
-  if (!videoId) throw new Error('HeyGen did not return video_id')
-  log('HeyGen video job created', { videoId, avatarScale: avatar.scale, scenes: videoInputs.length, hasProductImage: !!product.productImageUrl })
-  return videoId
+  const clipId = response.data?.id || response.data?.data?.id
+  if (!clipId) throw new Error('DiD did not return clip id')
+  log('DiD clip job created', {
+    clipId,
+    avatar: avatar.avatarId,
+    voice: avatar.voiceId,
+    role: avatar.role,
+    hasBackgroundImage: !!(brollBackgroundUrl || product.productImageUrl),
+  })
+  return clipId
 }
 
-async function pollHeyGen(videoId: string): Promise<string> {
-  const apiKey = process.env.HEYGEN_API_KEY
-  const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
-  const timeoutMs = Number(process.env.HEYGEN_POLL_TIMEOUT_MS || 1500000)
-  const intervalMs = Number(process.env.HEYGEN_POLL_INTERVAL_MS || 15000)
+async function pollDiDClip(clipId: string): Promise<string> {
+  const apiKey = pickEnv(['DID_API_KEY'])
+  if (!apiKey) throw new Error('Missing DID_API_KEY')
+  const endpoint = (pickEnv(['DID_API_ENDPOINT']) || 'https://api.d-id.com').replace(/\/$/, '')
+  const timeoutMs = Number(process.env.DID_POLL_TIMEOUT_MS || process.env.HEYGEN_POLL_TIMEOUT_MS || 1500000)
+  const intervalMs = Number(process.env.DID_POLL_INTERVAL_MS || process.env.HEYGEN_POLL_INTERVAL_MS || 15000)
   const start = Date.now()
 
   while (Date.now() - start < timeoutMs) {
-    const response = await axios.get(`${endpoint}/v1/video_status.get`, {
-      headers: { 'X-Api-Key': apiKey },
-      params: { video_id: videoId },
+    const response = await axios.get(`${endpoint}/clips/${clipId}`, {
+      headers: { Authorization: didAuthorization(apiKey) },
       timeout: 60000,
     })
-    const data = response.data?.data || response.data
+    const data = response.data || {}
     const status = String(data?.status || '').toLowerCase()
-    log('HeyGen status', { videoId, status })
-    const url = data?.video_url || data?.videoUrl || data?.url
-    if ((status.includes('complete') || status === 'success') && url) return url
-    if (status.includes('fail') || status === 'error') throw new Error(`HeyGen failed: ${data?.error || data?.error_message || 'unknown error'}`)
+    log('DiD status', { clipId, status })
+    if (status === 'done' && data?.result_url) return data.result_url
+    if (status === 'error' || status === 'rejected') {
+      const reason = data?.error?.description || data?.error?.message || data?.error || 'unknown error'
+      throw new Error(`DiD failed: ${reason}`)
+    }
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
 
-  throw new Error('HeyGen polling timed out')
+  throw new Error('DiD polling timed out')
 }
 
 function caption(product: Product, script: string): string {
   const tags = ['#NaturesWaySoil', '#SoilHealth', '#LawnCare', '#Gardening'].join(' ')
   return `${product.name}\n\n${product.description}\n\nShop direct: ${product.websiteUrl}\n\n${tags}`
-}
-
-function pickEnv(keys: string[]): string {
-  for (const key of keys) {
-    const value = process.env[key]?.trim()
-    if (value) return value
-  }
-  return ''
 }
 
 async function postToYouTube(videoUrl: string, title: string, description: string): Promise<string> {
@@ -620,16 +749,19 @@ async function postToInstagram(videoUrl: string, captionText: string): Promise<s
 
 async function main() {
   await loadSecrets()
+  normalizeGeneratorEnv()
 
   const products = loadProducts()
   if (!products.length) throw new Error('No products configured')
   const { product, variationIndex, variationCount } = pickProduct(products)
   const profile = productCreativeProfile(product)
+  const avatar = resolveDidAvatar(product, profile)
 
   log('Scheduled product selected', { product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
   log('Creative mapping selected', {
-    avatar: profile.avatarId || process.env.HEYGEN_DEFAULT_AVATAR || 'default',
-    voice: profile.voiceId || process.env.HEYGEN_DEFAULT_VOICE || 'default',
+    avatar: avatar.avatarId || 'default',
+    voice: avatar.voiceId || 'default',
+    role: avatar.role,
     hasScenePlan: !!profile.scenes?.length,
     hasProductImage: !!product.productImageUrl,
   })
@@ -645,8 +777,8 @@ async function main() {
     })),
   })
 
-  const videoId = await createHeyGenVideo(product, scenePlan, profile)
-  const videoUrl = await pollHeyGen(videoId)
+  const clipId = await createDiDClip(product, scenePlan, profile)
+  const videoUrl = await pollDiDClip(clipId)
   log('Finished video URL', { videoUrl })
 
   const captionText = caption(product, scenePlan.fullVoiceover)

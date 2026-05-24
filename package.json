@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Nature's Way Soil scheduled product video generation and social posting automation.",
+  "description": "Nature's Way Soil scheduled product video generation and social posting automation using DiD.",
   "scripts": {
     "post:scheduled": "ts-node scripts/post-scheduled.ts",
     "test:dry": "DRY_RUN_LOG_ONLY=true ts-node scripts/post-scheduled.ts",
     "test:creative": "ts-node scripts/test-creative-video.ts",
-    "list:heygen": "ts-node scripts/list-heygen-assets.ts"
+    "list:did": "ts-node scripts/list-heygen-assets.ts",
+    "list:heygen": "npm run list:did"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^6.1.1",

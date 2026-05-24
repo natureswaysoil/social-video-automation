@@ -3,7 +3,13 @@ import 'dotenv/config'
 import axios from 'axios'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 
-const SECRET_NAMES = ['HEYGEN_API_KEY', 'HEYGEN_API_ENDPOINT']
+const SECRET_NAMES = [
+  'DID_API_KEY',
+  'DID_API_ENDPOINT',
+  // Backward compatibility aliases
+  'HEYGEN_API_KEY',
+  'HEYGEN_API_ENDPOINT',
+]
 
 function good(value?: string) {
   return !!value && !/your_|your-|changeme|placeholder|paste_|replace_/i.test(value)
@@ -12,6 +18,11 @@ function good(value?: string) {
 function variants(name: string) {
   const upper = name.replace(/[\s-]+/g, '_').toUpperCase()
   return [...new Set([upper, upper.toLowerCase().replace(/_/g, '-'), upper.toLowerCase()])]
+}
+
+function normalizeEnv() {
+  if (!good(process.env.DID_API_KEY) && good(process.env.HEYGEN_API_KEY)) process.env.DID_API_KEY = process.env.HEYGEN_API_KEY
+  if (!good(process.env.DID_API_ENDPOINT) && good(process.env.HEYGEN_API_ENDPOINT)) process.env.DID_API_ENDPOINT = process.env.HEYGEN_API_ENDPOINT
 }
 
 async function loadSecrets() {
@@ -45,37 +56,48 @@ function printRows(title: string, rows: any[], pick: (row: any) => any) {
   })
 }
 
+function authHeader(apiKey: string): string {
+  const trimmed = String(apiKey || '').trim()
+  if (/^(basic|bearer)\s+/i.test(trimmed)) return trimmed
+  return `Basic ${trimmed}`
+}
+
 async function main() {
   await loadSecrets()
-  if (!process.env.HEYGEN_API_KEY) throw new Error('Missing HEYGEN_API_KEY')
-  const endpoint = process.env.HEYGEN_API_ENDPOINT || 'https://api.heygen.com'
-  const headers = { 'X-Api-Key': process.env.HEYGEN_API_KEY }
+  normalizeEnv()
 
-  const avatarRes = await axios.get(`${endpoint}/v2/avatars`, { headers, timeout: 60000 })
-  const voiceRes = await axios.get(`${endpoint}/v2/voices`, { headers, timeout: 60000 })
+  if (!process.env.DID_API_KEY) throw new Error('Missing DID_API_KEY')
+  const endpoint = (process.env.DID_API_ENDPOINT || 'https://api.d-id.com').replace(/\/$/, '')
+  const headers = { Authorization: authHeader(process.env.DID_API_KEY) }
+  const limit = Number(process.env.LIMIT || 60)
 
-  const avatars = avatarRes.data?.data?.avatars || avatarRes.data?.avatars || []
-  const voices = voiceRes.data?.data?.voices || voiceRes.data?.voices || []
+  const presenterRes = await axios.get(`${endpoint}/clips/presenters`, { headers, params: { limit }, timeout: 60000 })
+  const voiceRes = await axios.get(`${endpoint}/voices`, { headers, params: { limit }, timeout: 60000 })
 
-  printRows('Available HeyGen Avatars', avatars, (a) => ({
-    avatar_id: a.avatar_id,
-    avatar_name: a.avatar_name,
-    gender: a.gender,
-    preview: a.preview_image_url || a.preview_image,
+  const presenters = presenterRes.data?.presenters || presenterRes.data?.data?.presenters || presenterRes.data?.data || []
+  const voices = voiceRes.data?.voices || voiceRes.data?.data?.voices || voiceRes.data?.data || []
+
+  printRows('Available DiD Presenters', presenters, (p) => ({
+    presenter_id: p.presenter_id || p.id,
+    name: p.presenter_name || p.name,
+    gender: p.gender,
+    access: p.access,
+    preview: p.preview_url || p.thumbnail_url,
   }))
 
-  printRows('Available HeyGen Voices', voices, (v) => ({
-    voice_id: v.voice_id,
+  printRows('Available DiD Voices', voices, (v) => ({
+    voice_id: v.voice_id || v.id,
     name: v.name,
-    gender: v.gender,
-    language: v.language,
-    preview: v.preview_audio,
+    provider: v.provider?.type || v.provider || 'unknown',
+    language: v.language || v.locale,
+    access: v.access,
+    preview: v.preview_audio || v.preview_url,
   }))
 
-  console.log('\nUse the avatar_id and voice_id you like in config/creative-profiles.json.')
+  console.log('\nUse presenter_id and voice_id in config/creative-profiles.json (didAvatarId / didVoiceId) or set DID_AVATAR_* env vars.')
 }
 
 main().catch((error) => {
-  console.error('HeyGen asset listing failed:', error?.message || error)
+  console.error('DiD asset listing failed:', error?.message || error)
   process.exit(1)
 })
