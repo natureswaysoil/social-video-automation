@@ -1,5 +1,7 @@
 {
   "defaults": {
+    "didAvatarRole": "HOMEOWNER",
+    "didVoiceId": "en-US-AvaNeural",
     "avatarId": "Amanda_in_Blue_Shirt_Front",
     "voiceId": "ybOJaAgPlBdcGBEpCJzA",
     "avatarScale": 0.46,
@@ -10,6 +12,7 @@
   },
   "profiles": {
     "NWS_014": {
+      "didAvatarRole": "DOG_OWNER",
       "avatarId": "Amanda_Maintenance_Front",
       "voiceId": "6895c76b6f624e65b81e74671358d95b",
       "audience": "dog owners with yellow lawn spots, pet areas, kennels, patios, and turf runs",
@@ -31,6 +34,7 @@
       ]
     },
     "NWS_011": {
+      "didAvatarRole": "GARDENER",
       "avatarId": "Amanda_in_Blue_Shirt_Front",
       "voiceId": "ybOJaAgPlBdcGBEpCJzA",
       "audience": "gardeners and lawn owners dealing with tired soil, nutrient lockout, and weak roots",
@@ -52,6 +56,7 @@
       ]
     },
     "NWS_013": {
+      "didAvatarRole": "GARDENER",
       "avatarId": "Amanda_in_Grey_Shirt_Front",
       "voiceId": "ybOJaAgPlBdcGBEpCJzA",
       "audience": "raised bed, container, and garden growers who want a concentrated soil amendment",
@@ -73,6 +78,7 @@
       ]
     },
     "NWS_021": {
+      "didAvatarRole": "FARMER",
       "avatarId": "Albert_public_3",
       "voiceId": "3o5awrz3sR3uP9rxaD80",
       "audience": "landowners, small farms, horse owners, cattle owners, hay and pasture managers",
@@ -94,6 +100,7 @@
       ]
     },
     "NWS_018": {
+      "didAvatarRole": "HOMEOWNER",
       "avatarId": "Albert_public_3",
       "voiceId": "3o5awrz3sR3uP9rxaD80",
       "audience": "homeowners wanting greener turf and better root-zone support",
