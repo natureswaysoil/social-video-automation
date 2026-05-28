@@ -22,7 +22,14 @@ function authHeaders() {
 }
 
 export function didPresenter(profile: any) {
-  return profile.didPresenterUrl || process.env.DID_PRESENTER_URL || process.env.DID_DEFAULT_PRESENTER_URL || 'https://create-images-results.d-id.com/DefaultPresenters/amy/image.jpeg'
+  const url = profile.didPresenterUrl || process.env.DID_PRESENTER_URL || process.env.DID_DEFAULT_PRESENTER_URL || ''
+  if (!url) {
+    throw new Error('Missing D-ID presenter image URL. Set DID_PRESENTER_URL or DID_DEFAULT_PRESENTER_URL to a publicly accessible HTTPS image URL, or add didPresenterUrl in config/creative-profiles.json.')
+  }
+  if (!/^https:\/\//i.test(url)) {
+    throw new Error(`Invalid D-ID presenter URL. Must be HTTPS: ${url}`)
+  }
+  return url
 }
 
 export function didVoice(profile: any) {
@@ -32,10 +39,11 @@ export function didVoice(profile: any) {
 export async function createDidVideo(product: any, scenePlan: any, profile: any) {
   const endpoint = process.env.DID_API_ENDPOINT || 'https://api.d-id.com'
   const voiceId = didVoice(profile)
+  const presenter = didPresenter(profile)
   const script = scenePlan.fullVoiceover || (scenePlan.scenes || []).map((s: any) => s.voiceover).join(' ')
 
   const body: any = {
-    source_url: didPresenter(profile),
+    source_url: presenter,
     script: {
       type: 'text',
       input: script,
@@ -63,7 +71,7 @@ export async function createDidVideo(product: any, scenePlan: any, profile: any)
 
     const id = response.data?.id
     if (!id) throw new Error(`D-ID did not return talk id: ${JSON.stringify(response.data)}`)
-    console.log('D-ID video job created', { id, product: product.name, voiceId, presenter: didPresenter(profile) })
+    console.log('D-ID video job created', { id, product: product.name, voiceId, presenter })
     return id
   } catch (error: any) {
     throw new Error(`D-ID create failed: ${formatAxiosError(error)}`)
