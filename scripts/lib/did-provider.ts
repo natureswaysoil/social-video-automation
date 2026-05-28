@@ -21,20 +21,23 @@ function authHeaders() {
   }
 }
 
+const DEFAULT_FEMALE_PRESENTER = process.env.DID_AVATAR_DEFAULT || process.env.DID_AVATAR_FEMALE || 'amy-Aq6OmGZnMt'
+const DEFAULT_FEMALE_VOICE = process.env.DID_DEFAULT_VOICE_ID || process.env.DID_VOICE_FEMALE || 'en-US-JennyNeural'
+
 const PRESENTER_MAP = {
-  lawn: process.env.DID_AVATAR_LAWN || 'amy-Aq6OmGZnMt',
-  pasture: process.env.DID_AVATAR_PASTURE || 'jack-Ups6f8ORNL',
-  garden: process.env.DID_AVATAR_GARDEN || 'anna-j1VfXf1k5F',
-  pet: process.env.DID_AVATAR_PET || 'amy-Aq6OmGZnMt',
-  default: process.env.DID_AVATAR_DEFAULT || 'amy-Aq6OmGZnMt'
+  lawn: process.env.DID_AVATAR_LAWN || DEFAULT_FEMALE_PRESENTER,
+  pasture: process.env.DID_AVATAR_PASTURE || DEFAULT_FEMALE_PRESENTER,
+  garden: process.env.DID_AVATAR_GARDEN || DEFAULT_FEMALE_PRESENTER,
+  pet: process.env.DID_AVATAR_PET || DEFAULT_FEMALE_PRESENTER,
+  default: DEFAULT_FEMALE_PRESENTER
 }
 
 const VOICE_MAP = {
-  lawn: process.env.DID_VOICE_LAWN || 'en-US-JennyNeural',
-  pasture: process.env.DID_VOICE_PASTURE || 'en-US-GuyNeural',
-  garden: process.env.DID_VOICE_GARDEN || 'en-US-JennyNeural',
-  pet: process.env.DID_VOICE_PET || 'en-US-JennyNeural',
-  default: process.env.DID_DEFAULT_VOICE_ID || 'en-US-JennyNeural'
+  lawn: process.env.DID_VOICE_LAWN || DEFAULT_FEMALE_VOICE,
+  pasture: process.env.DID_VOICE_PASTURE || DEFAULT_FEMALE_VOICE,
+  garden: process.env.DID_VOICE_GARDEN || DEFAULT_FEMALE_VOICE,
+  pet: process.env.DID_VOICE_PET || DEFAULT_FEMALE_VOICE,
+  default: DEFAULT_FEMALE_VOICE
 }
 
 function productGroup(product: any) {
@@ -50,7 +53,7 @@ export function didPresenter(profile: any, product?: any) {
   const url = profile.didPresenterUrl || process.env.DID_PRESENTER_URL || process.env.DID_DEFAULT_PRESENTER_URL || ''
   if (url) {
     if (!/^https:\/\//i.test(url)) throw new Error(`Invalid D-ID presenter URL. Must be HTTPS: ${url}`)
-    return { type: 'source_url', value: url }
+    return { type: 'source_url', value: url, group: productGroup(product) }
   }
   const group = productGroup(product)
   const presenterId = profile.didPresenterId || profile.presenterId || PRESENTER_MAP[group] || PRESENTER_MAP.default
@@ -102,7 +105,7 @@ export async function createDidVideo(product: any, scenePlan: any, profile: any)
 
     const id = response.data?.id
     if (!id) throw new Error(`D-ID did not return talk id: ${JSON.stringify(response.data)}`)
-    console.log('D-ID video job created', { id, product: product.name, voiceId, presenter })
+    console.log('D-ID narrator job created', { id, product: product.name, voiceId, presenter })
     return id
   } catch (error: any) {
     throw new Error(`D-ID create failed: ${formatAxiosError(error)}`)
