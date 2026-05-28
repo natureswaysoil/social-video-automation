@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import OpenAI from 'openai'
 import { execSync } from 'child_process'
+import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import { createDidVideo, pollDidVideo } from './lib/did-provider'
 import { downloadPexelsVideo } from './lib/pexels-media'
 import { composeVerticalAd } from './lib/ffmpeg-compositor'
@@ -19,6 +20,42 @@ const OUTPUT_DIR = path.resolve(ROOT, 'output')
 const TEMP_DIR = path.resolve(ROOT, 'temp-commercial')
 const MANIFEST_DIR = path.resolve(ROOT, 'data/runs')
 const FOOTAGE_DIR = path.resolve(ROOT, process.env.FOOTAGE_DIR || 'footage')
+const SECRET_NAMES = ['OPENAI_API_KEY', 'OPENAI_MODEL', 'PEXELS_API_KEY', 'DID_API_KEY', 'DiD']
+
+function hasValue(name: string) {
+  const value = process.env[name]
+  return !!value && !/your-|your_|changeme|placeholder|paste_|replace_|dummy_|example_/i.test(value)
+}
+
+function secretCandidates(name: string) {
+  const upper = name.trim().replace(/[\s-]+/g, '_').toUpperCase()
+  return [...new Set([name, upper, upper.toLowerCase(), upper.toLowerCase().replace(/_/g, '-')])]
+}
+
+async function loadSecrets() {
+  if (String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() === 'false') return
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'natureswaysoil-video'
+  const client = new SecretManagerServiceClient()
+  for (const name of SECRET_NAMES) {
+    if (hasValue(name)) continue
+    for (const candidate of secretCandidates(name)) {
+      try {
+        const [version] = await client.accessSecretVersion({ name: `projects/${projectId}/secrets/${candidate}/versions/latest` })
+        const value = version.payload?.data?.toString().trim()
+        if (value) {
+          process.env[name] = value
+          process.env[candidate] = value
+          if (candidate === 'DiD' || name === 'DiD') process.env.DID_API_KEY = value
+          console.log(`Loaded secret: ${candidate}${candidate === name ? '' : ` -> ${name}`}`)
+          break
+        }
+      } catch (error: any) {
+        if (Number(error?.code) === 5 || String(error?.message || '').includes('NOT_FOUND')) continue
+        break
+      }
+    }
+  }
+}
 
 function pickProduct() {
   const raw = readJson(PRODUCTS_PATH, { topProducts: [] })
@@ -62,10 +99,7 @@ function localFootageCandidates(product: any) {
 
 async function generateScenePlan(product: any, profile: any, hook: string) {
   if (!process.env.OPENAI_API_KEY) {
-    return {
-      fullVoiceover: `${hook}. ${product.description}. Shop Nature's Way Soil today.`,
-      scenes: fallbackQueries(product).slice(0, 5).map((query: string, i: number) => ({ name: `Scene ${i + 1}`, seconds: i === 0 ? 3 : 5, voiceover: product.description, brollQuery: query }))
-    }
+    return { fullVoiceover: `${hook}. ${product.description}. Shop Nature's Way Soil today.`, scenes: fallbackQueries(product).slice(0, 5).map((query: string, i: number) => ({ name: `Scene ${i + 1}`, seconds: i === 0 ? 3 : 5, voiceover: product.description, brollQuery: query })) }
   }
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const prompt = `Build a commercial short-form ad scene plan for Nature's Way Soil.
@@ -108,70 +142,34 @@ function exportPlatformVariants(masterFile: string, product: any) {
 }
 
 async function uploadAutomatically(variants: any[], manifest: any) {
-  if (String(process.env.AUTO_UPLOAD || 'false').toLowerCase() !== 'true') {
-    return variants.map(v => ({ platform: v.platform, skipped: true, reason: 'AUTO_UPLOAD not enabled', file: v.file }))
-  }
+  if (String(process.env.AUTO_UPLOAD || 'false').toLowerCase() !== 'true') return variants.map(v => ({ platform: v.platform, skipped: true, reason: 'AUTO_UPLOAD not enabled', file: v.file }))
   return variants.map(v => ({ platform: v.platform, queued: true, file: v.file }))
 }
 
 async function main() {
-  ensureDir(OUTPUT_DIR)
-  ensureDir(TEMP_DIR)
-  ensureDir(MANIFEST_DIR)
-  ensureDir(FOOTAGE_DIR)
-
+  await loadSecrets()
+  ensureDir(OUTPUT_DIR); ensureDir(TEMP_DIR); ensureDir(MANIFEST_DIR); ensureDir(FOOTAGE_DIR)
   const product = pickProduct()
   const profile = creativeFor(product)
   const baseHook = product.hook || `${product.name} can help support better soil.`
   const bestHook = chooseBestHook(baseHook)
-
   console.log('Commercial pipeline selected product', { product: product.name, hook: bestHook })
-
   const scenePlan = await generateScenePlan(product, profile, bestHook.hook)
   const sceneFiles = []
-
-  for (const file of localFootageCandidates(product).slice(0, 5)) {
-    sceneFiles.push(file)
-  }
-
-  const queries = [
-    ...(scenePlan.scenes || []).map((s: any) => s.brollQuery).filter(Boolean),
-    ...(product.brollQueries || []),
-    ...fallbackQueries(product)
-  ]
-
+  for (const file of localFootageCandidates(product).slice(0, 5)) sceneFiles.push(file)
+  const queries = [...(scenePlan.scenes || []).map((s: any) => s.brollQuery).filter(Boolean), ...(product.brollQueries || []), ...fallbackQueries(product)]
   for (let i = 0; sceneFiles.length < 5 && i < queries.length; i++) {
     const query = queries[i]
-    try {
-      const file = await downloadPexelsVideo(query, TEMP_DIR, i)
-      if (file) sceneFiles.push(file)
-    } catch (error: any) {
-      console.log('Footage ingestion failed', { query, error: error?.message || error })
-    }
+    try { const file = await downloadPexelsVideo(query, TEMP_DIR, i); if (file) sceneFiles.push(file) } catch (error: any) { console.log('Footage ingestion failed', { query, error: error?.message || error }) }
   }
-
   if (!sceneFiles.length) throw new Error('No footage available. Add .mp4 files to footage/ or check PEXELS_API_KEY.')
-
   let narratorVideo = ''
-  if (String(process.env.ENABLE_NARRATOR || 'true').toLowerCase() !== 'false') {
-    const narratorId = await createDidVideo(product, scenePlan, profile)
-    narratorVideo = await pollDidVideo(narratorId)
-  }
-
+  if (String(process.env.ENABLE_NARRATOR || 'true').toLowerCase() !== 'false') { const narratorId = await createDidVideo(product, scenePlan, profile); narratorVideo = await pollDidVideo(narratorId) }
   const productImage = await downloadProductImage(product, TEMP_DIR)
-  const master = await composeVerticalAd({
-    outputName: `${safeFileName(product.name)}-master.mp4`,
-    sceneFiles,
-    narratorVideo,
-    productImage,
-    captionText: bestHook.hook,
-    overlayText: productOverlayText(product)
-  })
-
+  const master = await composeVerticalAd({ outputName: `${safeFileName(product.name)}-master.mp4`, sceneFiles, narratorVideo, productImage, captionText: bestHook.hook, overlayText: productOverlayText(product) })
   const thumbnail = await makeThumbnail(master, product, bestHook.hook)
   const variants = exportPlatformVariants(master, product)
   const uploadResults = await uploadAutomatically(variants, { product, scenePlan })
-
   const run = { runId: Date.now(), createdAt: new Date().toISOString(), product, hook: bestHook, scenePlan, sceneFiles, narratorVideo, master, thumbnail, variants, uploadResults }
   const manifestFile = path.resolve(MANIFEST_DIR, `${run.runId}-${safeFileName(product.name)}.json`)
   writeJson(manifestFile, run)
