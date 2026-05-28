@@ -1,0 +1,89 @@
+// @ts-nocheck
+import axios from 'axios'
+
+function pickDidApiKey() {
+  return process.env.DID_API_KEY || process.env.DiD || process.env.DID || ''
+}
+
+function authHeaders() {
+  const apiKey = pickDidApiKey()
+  if (!apiKey) throw new Error('Missing DID_API_KEY. Google Secret Manager alias DiD is supported by validate-config.')
+  return {
+    Authorization: `Basic ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+}
+
+export function didPresenter(profile: any) {
+  return profile.didPresenterUrl || process.env.DID_PRESENTER_URL || process.env.DID_DEFAULT_PRESENTER_URL || 'https://create-images-results.d-id.com/DefaultPresenters/amy/image.jpeg'
+}
+
+export function didVoice(profile: any) {
+  return profile.didVoiceId || process.env.DID_VOICE_ID || process.env.DID_DEFAULT_VOICE_ID || ''
+}
+
+export async function createDidVideo(product: any, scenePlan: any, profile: any) {
+  const endpoint = process.env.DID_API_ENDPOINT || 'https://api.d-id.com'
+  const voiceId = didVoice(profile)
+  const script = scenePlan.fullVoiceover || (scenePlan.scenes || []).map((s: any) => s.voiceover).join(' ')
+
+  const body: any = {
+    source_url: didPresenter(profile),
+    script: {
+      type: 'text',
+      input: script,
+      provider: {
+        type: process.env.DID_TTS_PROVIDER || 'microsoft',
+        voice_id: voiceId || undefined
+      }
+    },
+    config: {
+      stitch: true,
+      fluent: true,
+      result_format: 'mp4'
+    },
+    user_data: {
+      productId: product.id,
+      productName: product.name
+    }
+  }
+
+  if (!voiceId) delete body.script.provider.voice_id
+
+  const response = await axios.post(`${endpoint}/talks`, body, {
+    headers: authHeaders(),
+    timeout: 120000
+  })
+
+  const id = response.data?.id
+  if (!id) throw new Error(`D-ID did not return talk id: ${JSON.stringify(response.data)}`)
+  console.log('D-ID video job created', { id, product: product.name })
+  return id
+}
+
+export async function pollDidVideo(id: string) {
+  const endpoint = process.env.DID_API_ENDPOINT || 'https://api.d-id.com'
+  const timeoutMs = Number(process.env.DID_POLL_TIMEOUT_MS || 1200000)
+  const intervalMs = Number(process.env.DID_POLL_INTERVAL_MS || 10000)
+  const start = Date.now()
+
+  while (Date.now() - start < timeoutMs) {
+    const response = await axios.get(`${endpoint}/talks/${id}`, {
+      headers: authHeaders(),
+      timeout: 60000
+    })
+
+    const data = response.data || {}
+    const status = String(data.status || '').toLowerCase()
+    console.log('D-ID status', { id, status })
+
+    if ((status === 'done' || status === 'completed') && data.result_url) return data.result_url
+    if (status === 'error' || status === 'failed' || data.error) {
+      throw new Error(`D-ID failed: ${JSON.stringify(data.error || data)}`)
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+
+  throw new Error('D-ID polling timed out')
+}
