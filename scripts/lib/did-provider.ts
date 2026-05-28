@@ -49,10 +49,10 @@ export async function createDidVideo(product: any, scenePlan: any, profile: any)
       fluent: true,
       result_format: 'mp4'
     },
-    user_data: {
+    user_data: JSON.stringify({
       productId: product.id,
       productName: product.name
-    }
+    })
   }
 
   try {
