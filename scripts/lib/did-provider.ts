@@ -5,6 +5,13 @@ function pickDidApiKey() {
   return process.env.DID_API_KEY || process.env.DiD || process.env.DID || ''
 }
 
+function formatAxiosError(error: any) {
+  const status = error?.response?.status
+  const data = error?.response?.data
+  const message = error?.message || String(error)
+  return JSON.stringify({ status, message, data }, null, 2)
+}
+
 function authHeaders() {
   const apiKey = pickDidApiKey()
   if (!apiKey) throw new Error('Missing DID_API_KEY. Google Secret Manager alias DiD is supported by validate-config.')
@@ -19,7 +26,7 @@ export function didPresenter(profile: any) {
 }
 
 export function didVoice(profile: any) {
-  return profile.didVoiceId || process.env.DID_VOICE_ID || process.env.DID_DEFAULT_VOICE_ID || ''
+  return profile.didVoiceId || process.env.DID_VOICE_ID || process.env.DID_DEFAULT_VOICE_ID || 'en-US-JennyNeural'
 }
 
 export async function createDidVideo(product: any, scenePlan: any, profile: any) {
@@ -34,7 +41,7 @@ export async function createDidVideo(product: any, scenePlan: any, profile: any)
       input: script,
       provider: {
         type: process.env.DID_TTS_PROVIDER || 'microsoft',
-        voice_id: voiceId || undefined
+        voice_id: voiceId
       }
     },
     config: {
@@ -48,17 +55,19 @@ export async function createDidVideo(product: any, scenePlan: any, profile: any)
     }
   }
 
-  if (!voiceId) delete body.script.provider.voice_id
+  try {
+    const response = await axios.post(`${endpoint}/talks`, body, {
+      headers: authHeaders(),
+      timeout: 120000
+    })
 
-  const response = await axios.post(`${endpoint}/talks`, body, {
-    headers: authHeaders(),
-    timeout: 120000
-  })
-
-  const id = response.data?.id
-  if (!id) throw new Error(`D-ID did not return talk id: ${JSON.stringify(response.data)}`)
-  console.log('D-ID video job created', { id, product: product.name })
-  return id
+    const id = response.data?.id
+    if (!id) throw new Error(`D-ID did not return talk id: ${JSON.stringify(response.data)}`)
+    console.log('D-ID video job created', { id, product: product.name, voiceId, presenter: didPresenter(profile) })
+    return id
+  } catch (error: any) {
+    throw new Error(`D-ID create failed: ${formatAxiosError(error)}`)
+  }
 }
 
 export async function pollDidVideo(id: string) {
@@ -68,18 +77,23 @@ export async function pollDidVideo(id: string) {
   const start = Date.now()
 
   while (Date.now() - start < timeoutMs) {
-    const response = await axios.get(`${endpoint}/talks/${id}`, {
-      headers: authHeaders(),
-      timeout: 60000
-    })
+    try {
+      const response = await axios.get(`${endpoint}/talks/${id}`, {
+        headers: authHeaders(),
+        timeout: 60000
+      })
 
-    const data = response.data || {}
-    const status = String(data.status || '').toLowerCase()
-    console.log('D-ID status', { id, status })
+      const data = response.data || {}
+      const status = String(data.status || '').toLowerCase()
+      console.log('D-ID status', { id, status })
 
-    if ((status === 'done' || status === 'completed') && data.result_url) return data.result_url
-    if (status === 'error' || status === 'failed' || data.error) {
-      throw new Error(`D-ID failed: ${JSON.stringify(data.error || data)}`)
+      if ((status === 'done' || status === 'completed') && data.result_url) return data.result_url
+      if (status === 'error' || status === 'failed' || data.error) {
+        throw new Error(`D-ID failed: ${JSON.stringify(data.error || data)}`)
+      }
+    } catch (error: any) {
+      if (error.message?.startsWith('D-ID failed:')) throw error
+      throw new Error(`D-ID poll failed: ${formatAxiosError(error)}`)
     }
 
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
