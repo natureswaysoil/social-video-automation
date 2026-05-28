@@ -8,6 +8,8 @@
     "post:scheduled": "ts-node scripts/post-scheduled.ts",
     "test:dry": "DRY_RUN_LOG_ONLY=true ts-node scripts/post-scheduled.ts",
     "test:creative": "ts-node scripts/test-creative-video.ts",
+    "validate": "ts-node scripts/validate-config.ts",
+    "validate:dry": "DRY_RUN_LOG_ONLY=true ts-node scripts/validate-config.ts",
     "list:heygen": "ts-node scripts/list-heygen-assets.ts"
   },
   "dependencies": {
