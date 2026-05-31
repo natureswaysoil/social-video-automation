@@ -11,8 +11,7 @@
     "validate": "ts-node scripts/validate-config.ts",
     "validate:dry": "DRY_RUN_LOG_ONLY=true ts-node scripts/validate-config.ts",
     "health": "ts-node scripts/server.ts",
-    "list:heygen": "ts-node scripts/list-heygen-assets.ts",
-    "analyze-groups": "tsx scripts/analyze-facebook-engagement.ts"
+    "analyze-groups": "ts-node scripts/analyze-facebook-engagement.ts"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^6.1.1",
