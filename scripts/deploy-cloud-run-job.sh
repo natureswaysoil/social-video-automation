@@ -10,12 +10,16 @@ SCHEDULE="${SCHEDULE:-0 11,15,17,22 * * *}"
 TIME_ZONE="${TIME_ZONE:-America/New_York}"
 SCHEDULER_NAME="${SCHEDULER_NAME:-social-video-broll-schedule}"
 ENV_FILE="${ENV_FILE:-/tmp/${JOB_NAME}.env.yaml}"
+JOB_MEMORY="${JOB_MEMORY:-4Gi}"
+JOB_CPU="${JOB_CPU:-2}"
+NODE_HEAP_MB="${NODE_HEAP_MB:-2048}"
 
 cat > "$ENV_FILE" <<EOF
 USE_SECRET_MANAGER: "true"
 GOOGLE_CLOUD_PROJECT: "${PROJECT_ID}"
 GCLOUD_PROJECT: "${PROJECT_ID}"
 GCP_PROJECT: "${PROJECT_ID}"
+NODE_OPTIONS: "--max-old-space-size=${NODE_HEAP_MB}"
 VIDEO_STYLE: "broll_ken_burns"
 GCS_PUBLIC_BUCKET: "natureswaysoil-social-videos"
 VIDEO_PUBLIC_BUCKET: "natureswaysoil-social-videos"
@@ -35,12 +39,15 @@ gcloud builds submit \
   .
 
 printf '\nDeploying Cloud Run Job: %s\n' "$JOB_NAME"
+printf 'Memory: %s | CPU: %s | Node heap: %s MB\n' "$JOB_MEMORY" "$JOB_CPU" "$NODE_HEAP_MB"
 if gcloud run jobs describe "$JOB_NAME" --project="$PROJECT_ID" --region="$REGION" >/dev/null 2>&1; then
   gcloud run jobs update "$JOB_NAME" \
     --project="$PROJECT_ID" \
     --region="$REGION" \
     --image="$IMAGE" \
     --service-account="$SERVICE_ACCOUNT" \
+    --memory="$JOB_MEMORY" \
+    --cpu="$JOB_CPU" \
     --task-timeout=3600s \
     --max-retries=0 \
     --env-vars-file="$ENV_FILE"
@@ -50,6 +57,8 @@ else
     --region="$REGION" \
     --image="$IMAGE" \
     --service-account="$SERVICE_ACCOUNT" \
+    --memory="$JOB_MEMORY" \
+    --cpu="$JOB_CPU" \
     --task-timeout=3600s \
     --max-retries=0 \
     --env-vars-file="$ENV_FILE"
@@ -94,4 +103,4 @@ gcloud run jobs execute "$JOB_NAME" \
   --wait
 
 printf '\nDone. Cloud Run Job and Cloud Scheduler are configured.\n'
-printf 'Job: %s\nRegion: %s\nSchedule: %s (%s)\n' "$JOB_NAME" "$REGION" "$SCHEDULE" "$TIME_ZONE"
+printf 'Job: %s\nRegion: %s\nSchedule: %s (%s)\nMemory: %s\nCPU: %s\nNode heap: %s MB\n' "$JOB_NAME" "$REGION" "$SCHEDULE" "$TIME_ZONE" "$JOB_MEMORY" "$JOB_CPU" "$NODE_HEAP_MB"
