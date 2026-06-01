@@ -5,6 +5,7 @@ import path from 'path'
 import axios from 'axios'
 import OpenAI from 'openai'
 import { google } from 'googleapis'
+import { Storage } from '@google-cloud/storage'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import { composeVerticalAd } from './lib/ffmpeg-compositor'
 import { downloadPexelsVideo } from './lib/pexels-media'
@@ -71,6 +72,12 @@ const SECRET_NAMES = [
   'INSTAGRAM_IG_ID',
   'INSTAGRAM_USER_ID',
   'INSTAGRAM_ACCOUNT_ID',
+  'FB_PAGE_ACCESS_TOKEN',
+  'FB_PAGE_ID',
+  'FACEBOOK_PAGE_ACCESS_TOKEN',
+  'FACEBOOK_PAGE_ID',
+  'GCS_PUBLIC_BUCKET',
+  'VIDEO_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_URL_BASE'
 ]
 
@@ -232,11 +239,37 @@ function isHttpUrl(value: string) {
   return /^https?:\/\//i.test(String(value || ''))
 }
 
-function platformVideoUrl(videoFileOrUrl: string) {
+function publicBucketName() {
+  return pickEnv(['GCS_PUBLIC_BUCKET', 'VIDEO_PUBLIC_BUCKET'])
+}
+
+function publicBucketUrlBase(bucket: string) {
+  const explicit = process.env.VIDEO_PUBLIC_URL_BASE?.replace(/\/$/, '') || ''
+  return explicit || `https://storage.googleapis.com/${bucket}`
+}
+
+async function uploadVideoForSocial(videoFileOrUrl: string): Promise<string> {
   if (isHttpUrl(videoFileOrUrl)) return videoFileOrUrl
-  const base = process.env.VIDEO_PUBLIC_URL_BASE?.replace(/\/$/, '') || ''
-  if (!base) return ''
-  return `${base}/${encodeURIComponent(path.basename(videoFileOrUrl))}`
+  const bucketName = publicBucketName()
+  if (!bucketName) throw new Error('Missing GCS_PUBLIC_BUCKET or VIDEO_PUBLIC_BUCKET. This is required for Instagram/Facebook public video URLs.')
+  const storage = new Storage()
+  const objectName = `social-videos/${Date.now()}-${safeFileName(path.basename(videoFileOrUrl), 'mp4')}`
+  await storage.bucket(bucketName).upload(videoFileOrUrl, {
+    destination: objectName,
+    resumable: false,
+    metadata: {
+      contentType: 'video/mp4',
+      cacheControl: 'public, max-age=604800'
+    }
+  })
+  try {
+    await storage.bucket(bucketName).file(objectName).makePublic()
+  } catch (error: any) {
+    log('Could not make uploaded video public. Bucket may use uniform public access; verify allUsers objectViewer or public bucket policy.', error?.message || error)
+  }
+  const publicUrl = `${publicBucketUrlBase(bucketName)}/${objectName.split('/').map(encodeURIComponent).join('/')}`
+  log('Uploaded video for social platforms', { bucketName, objectName, publicUrl })
+  return publicUrl
 }
 
 async function postToYouTube(videoFileOrUrl: string, title: string, description: string): Promise<string> {
@@ -256,16 +289,15 @@ async function postToYouTube(videoFileOrUrl: string, title: string, description:
   return id
 }
 
-async function postToInstagram(videoFileOrUrl: string, captionText: string): Promise<string> {
+async function postToInstagram(publicVideoUrl: string, captionText: string): Promise<string> {
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
   const igId = pickEnv(['INSTAGRAM_IG_ID', 'INSTAGRAM_USER_ID', 'INSTAGRAM_ACCOUNT_ID'])
   if (!accessToken || !igId) throw new Error('Missing Instagram access token or IG ID')
-  const videoUrl = platformVideoUrl(videoFileOrUrl)
-  if (!videoUrl) throw new Error('Instagram requires a public HTTPS video URL. Set VIDEO_PUBLIC_URL_BASE after uploading output/*.mp4 to a public host.')
+  if (!isHttpUrl(publicVideoUrl)) throw new Error('Instagram requires a public HTTPS video URL.')
   const apiVersion = process.env.INSTAGRAM_API_VERSION || 'v20.0'
   const host = process.env.INSTAGRAM_API_HOST || 'graph.facebook.com'
   const baseUrl = `https://${host}/${apiVersion}`
-  const container = await axios.post(`${baseUrl}/${igId}/media`, { media_type: process.env.IG_MEDIA_TYPE || 'REELS', video_url: videoUrl, caption: captionText }, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 120000 })
+  const container = await axios.post(`${baseUrl}/${igId}/media`, { media_type: process.env.IG_MEDIA_TYPE || 'REELS', video_url: publicVideoUrl, caption: captionText }, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 120000 })
   const creationId = container.data?.id
   if (!creationId) throw new Error('Instagram did not return creation id')
   for (let i = 0; i < 24; i++) {
@@ -280,6 +312,24 @@ async function postToInstagram(videoFileOrUrl: string, captionText: string): Pro
   const mediaId = published.data?.id || ''
   if (!mediaId) throw new Error('Instagram publish did not return media id')
   return mediaId
+}
+
+async function postToFacebook(publicVideoUrl: string, captionText: string): Promise<string> {
+  const accessToken = pickEnv(['FB_PAGE_ACCESS_TOKEN', 'FACEBOOK_PAGE_ACCESS_TOKEN'])
+  const pageId = pickEnv(['FB_PAGE_ID', 'FACEBOOK_PAGE_ID'])
+  if (!accessToken || !pageId) throw new Error('Missing Facebook page access token or page ID')
+  if (!isHttpUrl(publicVideoUrl)) throw new Error('Facebook requires a public HTTPS video URL.')
+  const apiVersion = process.env.FACEBOOK_API_VERSION || process.env.INSTAGRAM_API_VERSION || 'v20.0'
+  const host = process.env.FACEBOOK_API_HOST || 'graph.facebook.com'
+  const baseUrl = `https://${host}/${apiVersion}`
+  const response = await axios.post(`${baseUrl}/${pageId}/videos`, {
+    file_url: publicVideoUrl,
+    description: captionText,
+    published: true
+  }, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 120000 })
+  const id = response.data?.id || ''
+  if (!id) throw new Error(`Facebook did not return video id: ${JSON.stringify(response.data)}`)
+  return id
 }
 
 function localFootageCandidates(product: Product) {
@@ -363,21 +413,29 @@ async function main() {
   const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount)
   log('Generated scene plan', { fullVoiceoverLength: scenePlan.fullVoiceover.length, scenes: scenePlan.scenes.map((scene: CreativeScene, index: number) => ({ idx: index + 1, name: scene.name, seconds: scene.seconds, useProductImage: !!scene.useProductImage, brollQuery: scene.brollQuery })) })
   const captionText = caption(product, scenePlan.fullVoiceover)
-  const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean)
+  const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean)
   if (String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true') {
     log('Dry run enabled; skipping render and social posting', { videoStyle: process.env.VIDEO_STYLE, platforms, caption: captionText, voiceover: scenePlan.fullVoiceover })
     return
   }
   const videoFile = await renderVideo(product, scenePlan)
+  let publicVideoUrl = ''
+  if (platforms.includes('instagram') || platforms.includes('facebook')) {
+    publicVideoUrl = await uploadVideoForSocial(videoFile)
+  }
+
   let posted = 0
   if (platforms.includes('youtube')) {
     try { const id = await postToYouTube(videoFile, product.name, captionText); posted++; log('Posted to YouTube', { id }) } catch (error: any) { log('YouTube post failed', error?.message || error) }
   }
   if (platforms.includes('instagram')) {
-    try { const id = await postToInstagram(videoFile, captionText); posted++; log('Posted to Instagram', { id }) } catch (error: any) { log('Instagram post failed', error?.message || error) }
+    try { const id = await postToInstagram(publicVideoUrl, captionText); posted++; log('Posted to Instagram', { id }) } catch (error: any) { log('Instagram post failed', error?.message || error) }
+  }
+  if (platforms.includes('facebook')) {
+    try { const id = await postToFacebook(publicVideoUrl, captionText); posted++; log('Posted to Facebook', { id }) } catch (error: any) { log('Facebook post failed', error?.message || error) }
   }
   if (posted === 0) throw new Error('No platform posts succeeded')
-  log('Scheduled post completed', { posted, videoFile })
+  log('Scheduled post completed', { posted, videoFile, publicVideoUrl })
 }
 
 main().catch((error) => { console.error('Scheduled post failed:', error?.message || error); process.exit(1) })
