@@ -40,11 +40,12 @@ jobs:
       ROTATION_STATE_FILE: data/rotation-state.json
       RUN_POSTING: 'true'
 
-      # Public video hosting for Instagram/Facebook. These may be loaded from
-      # Google Secret Manager or direct GitHub repo secrets.
-      GCS_PUBLIC_BUCKET: ${{ secrets.GCS_PUBLIC_BUCKET }}
-      VIDEO_PUBLIC_BUCKET: ${{ secrets.VIDEO_PUBLIC_BUCKET }}
-      VIDEO_PUBLIC_URL_BASE: ${{ secrets.VIDEO_PUBLIC_URL_BASE }}
+      # Public video hosting for Instagram/Facebook.
+      # The automation uploads each rendered MP4 to:
+      # gs://natureswaysoil-social-videos/social-videos/
+      GCS_PUBLIC_BUCKET: natureswaysoil-social-videos
+      VIDEO_PUBLIC_BUCKET: natureswaysoil-social-videos
+      VIDEO_PUBLIC_URL_BASE: https://storage.googleapis.com/natureswaysoil-social-videos/social-videos
 
       # Optional direct GitHub repo secrets fallback. These stay masked by GitHub.
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -159,6 +160,8 @@ jobs:
             echo "- Auth mode: $mode"
             echo "- Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
             echo "- Secret Manager enabled: ${USE_SECRET_MANAGER:-false}"
+            echo "- Public video bucket: ${GCS_PUBLIC_BUCKET:-unset}"
+            echo "- Public video URL base: ${VIDEO_PUBLIC_URL_BASE:-unset}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate direct GitHub secrets fallback
