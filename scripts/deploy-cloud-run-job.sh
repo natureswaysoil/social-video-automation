@@ -9,6 +9,24 @@ IMAGE="${IMAGE:-gcr.io/${PROJECT_ID}/${JOB_NAME}:latest}"
 SCHEDULE="${SCHEDULE:-0 11,15,17,22 * * *}"
 TIME_ZONE="${TIME_ZONE:-America/New_York}"
 SCHEDULER_NAME="${SCHEDULER_NAME:-social-video-broll-schedule}"
+ENV_FILE="${ENV_FILE:-/tmp/${JOB_NAME}.env.yaml}"
+
+cat > "$ENV_FILE" <<EOF
+USE_SECRET_MANAGER: "true"
+GOOGLE_CLOUD_PROJECT: "${PROJECT_ID}"
+GCLOUD_PROJECT: "${PROJECT_ID}"
+GCP_PROJECT: "${PROJECT_ID}"
+VIDEO_STYLE: "broll_ken_burns"
+GCS_PUBLIC_BUCKET: "natureswaysoil-social-videos"
+VIDEO_PUBLIC_BUCKET: "natureswaysoil-social-videos"
+VIDEO_PUBLIC_URL_BASE: "https://storage.googleapis.com/natureswaysoil-social-videos"
+ENABLE_PLATFORMS: "youtube,instagram,facebook"
+YT_PRIVACY_STATUS: "public"
+DRY_RUN_LOG_ONLY: "false"
+SEED_PRODUCT_LIMIT: "5"
+VARIATIONS_PER_PRODUCT: "5"
+ROTATION_STATE_FILE: "data/rotation-state.json"
+EOF
 
 printf '\nBuilding image: %s\n' "$IMAGE"
 gcloud builds submit \
@@ -17,23 +35,25 @@ gcloud builds submit \
   .
 
 printf '\nDeploying Cloud Run Job: %s\n' "$JOB_NAME"
-gcloud run jobs describe "$JOB_NAME" --project="$PROJECT_ID" --region="$REGION" >/dev/null 2>&1 \
-  && gcloud run jobs update "$JOB_NAME" \
+if gcloud run jobs describe "$JOB_NAME" --project="$PROJECT_ID" --region="$REGION" >/dev/null 2>&1; then
+  gcloud run jobs update "$JOB_NAME" \
     --project="$PROJECT_ID" \
     --region="$REGION" \
     --image="$IMAGE" \
     --service-account="$SERVICE_ACCOUNT" \
     --task-timeout=3600s \
     --max-retries=0 \
-    --set-env-vars="USE_SECRET_MANAGER=true,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GCLOUD_PROJECT=${PROJECT_ID},GCP_PROJECT=${PROJECT_ID},VIDEO_STYLE=broll_ken_burns,GCS_PUBLIC_BUCKET=natureswaysoil-social-videos,VIDEO_PUBLIC_BUCKET=natureswaysoil-social-videos,VIDEO_PUBLIC_URL_BASE=https://storage.googleapis.com/natureswaysoil-social-videos,ENABLE_PLATFORMS=youtube\,instagram\,facebook,YT_PRIVACY_STATUS=public,DRY_RUN_LOG_ONLY=false,SEED_PRODUCT_LIMIT=5,VARIATIONS_PER_PRODUCT=5,ROTATION_STATE_FILE=data/rotation-state.json" \
-  || gcloud run jobs create "$JOB_NAME" \
+    --env-vars-file="$ENV_FILE"
+else
+  gcloud run jobs create "$JOB_NAME" \
     --project="$PROJECT_ID" \
     --region="$REGION" \
     --image="$IMAGE" \
     --service-account="$SERVICE_ACCOUNT" \
     --task-timeout=3600s \
     --max-retries=0 \
-    --set-env-vars="USE_SECRET_MANAGER=true,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GCLOUD_PROJECT=${PROJECT_ID},GCP_PROJECT=${PROJECT_ID},VIDEO_STYLE=broll_ken_burns,GCS_PUBLIC_BUCKET=natureswaysoil-social-videos,VIDEO_PUBLIC_BUCKET=natureswaysoil-social-videos,VIDEO_PUBLIC_URL_BASE=https://storage.googleapis.com/natureswaysoil-social-videos,ENABLE_PLATFORMS=youtube\,instagram\,facebook,YT_PRIVACY_STATUS=public,DRY_RUN_LOG_ONLY=false,SEED_PRODUCT_LIMIT=5,VARIATIONS_PER_PRODUCT=5,ROTATION_STATE_FILE=data/rotation-state.json"
+    --env-vars-file="$ENV_FILE"
+fi
 
 printf '\nGranting Cloud Scheduler permission to run the job.\n'
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
@@ -47,16 +67,8 @@ gcloud run jobs add-iam-policy-binding "$JOB_NAME" \
 RUN_URI="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/${JOB_NAME}:run"
 
 printf '\nCreating/updating Cloud Scheduler job: %s\n' "$SCHEDULER_NAME"
-gcloud scheduler jobs describe "$SCHEDULER_NAME" --project="$PROJECT_ID" --location="$REGION" >/dev/null 2>&1 \
-  && gcloud scheduler jobs update http "$SCHEDULER_NAME" \
-    --project="$PROJECT_ID" \
-    --location="$REGION" \
-    --schedule="$SCHEDULE" \
-    --time-zone="$TIME_ZONE" \
-    --uri="$RUN_URI" \
-    --http-method=POST \
-    --oauth-service-account-email="$SERVICE_ACCOUNT" \
-  || gcloud scheduler jobs create http "$SCHEDULER_NAME" \
+if gcloud scheduler jobs describe "$SCHEDULER_NAME" --project="$PROJECT_ID" --location="$REGION" >/dev/null 2>&1; then
+  gcloud scheduler jobs update http "$SCHEDULER_NAME" \
     --project="$PROJECT_ID" \
     --location="$REGION" \
     --schedule="$SCHEDULE" \
@@ -64,6 +76,16 @@ gcloud scheduler jobs describe "$SCHEDULER_NAME" --project="$PROJECT_ID" --locat
     --uri="$RUN_URI" \
     --http-method=POST \
     --oauth-service-account-email="$SERVICE_ACCOUNT"
+else
+  gcloud scheduler jobs create http "$SCHEDULER_NAME" \
+    --project="$PROJECT_ID" \
+    --location="$REGION" \
+    --schedule="$SCHEDULE" \
+    --time-zone="$TIME_ZONE" \
+    --uri="$RUN_URI" \
+    --http-method=POST \
+    --oauth-service-account-email="$SERVICE_ACCOUNT"
+fi
 
 printf '\nRunning one test execution now...\n'
 gcloud run jobs execute "$JOB_NAME" \
