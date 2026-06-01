@@ -45,7 +45,8 @@ jobs:
       # gs://natureswaysoil-social-videos/social-videos/
       GCS_PUBLIC_BUCKET: natureswaysoil-social-videos
       VIDEO_PUBLIC_BUCKET: natureswaysoil-social-videos
-      VIDEO_PUBLIC_URL_BASE: https://storage.googleapis.com/natureswaysoil-social-videos/social-videos
+      # Keep this at the bucket root. The script appends social-videos/<filename>.
+      VIDEO_PUBLIC_URL_BASE: https://storage.googleapis.com/natureswaysoil-social-videos
 
       # Optional direct GitHub repo secrets fallback. These stay masked by GitHub.
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
