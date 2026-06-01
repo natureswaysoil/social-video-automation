@@ -6,7 +6,10 @@ import axios from 'axios'
 import OpenAI from 'openai'
 import { google } from 'googleapis'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
-import { createDidVideo, pollDidVideo } from './lib/did-provider'
+import { composeVerticalAd } from './lib/ffmpeg-compositor'
+import { downloadPexelsVideo } from './lib/pexels-media'
+import { downloadProductImage, productOverlayText } from './lib/product-assets'
+import { ensureDir, safeFileName } from './lib/video-utils'
 
 type Product = {
   id: string
@@ -32,16 +35,11 @@ type CreativeScene = {
   voiceover?: string
   brollQueries?: string[]
   brollQuery?: string
+  caption?: string
   useProductImage?: boolean
 }
 
 type CreativeProfile = {
-  avatarId?: string
-  voiceId?: string
-  didPresenterUrl?: string
-  didVoiceId?: string
-  avatarScale?: number
-  avatarOffsetY?: number
   audience?: string
   angle?: string
   tone?: string
@@ -54,16 +52,14 @@ const ROOT = process.cwd()
 const CONFIG_PATH = path.resolve(ROOT, 'config/top-products.json')
 const STATE_PATH = path.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json')
 const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
+const OUTPUT_DIR = path.resolve(ROOT, 'output')
+const TEMP_DIR = path.resolve(ROOT, 'temp-scheduled')
+const FOOTAGE_DIR = path.resolve(ROOT, process.env.FOOTAGE_DIR || 'footage')
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
 
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
   'OPENAI_MODEL',
-  'DID_API_KEY',
-  'DiD',
-  'DID_API_ENDPOINT',
-  'DID_DEFAULT_PRESENTER_URL',
-  'DID_DEFAULT_VOICE_ID',
   'PEXELS_API_KEY',
   'YT_CLIENT_ID',
   'YT_CLIENT_SECRET',
@@ -74,7 +70,8 @@ const SECRET_NAMES = [
   'INSTAGRAM_ACCESS_TOKEN',
   'INSTAGRAM_IG_ID',
   'INSTAGRAM_USER_ID',
-  'INSTAGRAM_ACCOUNT_ID'
+  'INSTAGRAM_ACCOUNT_ID',
+  'VIDEO_PUBLIC_URL_BASE'
 ]
 
 function log(message: string, data?: any) {
@@ -110,7 +107,6 @@ async function loadSecrets() {
         if (value) {
           process.env[secretName] = value
           process.env[candidate] = value
-          if (secretName === 'DiD' || candidate === 'DiD') process.env.DID_API_KEY = value
           log(`Loaded secret: ${candidate}${candidate === secretName ? '' : ` -> ${secretName}`}`)
           break
         }
@@ -169,7 +165,7 @@ function fallbackScenes(product: Product, profile: CreativeProfile): CreativeSce
     { name: 'Product Hero', seconds: 5, voiceover: `${product.name} is designed to support healthier soil and stronger-looking growth.`, brollQuery: base[1] || product.name, useProductImage: true },
     { name: 'Application', seconds: 6, voiceover: 'Use it as part of your regular lawn, garden, pasture, or soil care routine according to label directions.', brollQuery: base[2] || 'spraying lawn' },
     { name: 'Soil Benefit', seconds: 6, voiceover: 'The goal is better soil support, root-zone activity, and nutrient availability.', brollQuery: base[3] || 'healthy soil close up' },
-    { name: 'Result / CTA', seconds: 6, voiceover: profile.cta || `Shop Nature's Way Soil direct or on Amazon.`, brollQuery: base[4] || 'healthy green lawn' }
+    { name: 'Result / CTA', seconds: 6, voiceover: profile.cta || `Shop Nature's Way Soil direct or on Amazon.`, brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
   ]
 }
 
@@ -196,11 +192,12 @@ Angle: ${profile.angle || 'soil-first product explanation'}
 Tone: ${profile.tone || 'plainspoken and practical'}
 Rules:
 - Strong first 3 seconds.
+- Use b-roll and product-image visuals, not a talking-head avatar.
 - No guaranteed results.
 - No pesticide, disease, or cure claims.
-- Product should be mentioned early.
+- Product should be visible by scene 2.
 - End with a direct CTA.
-- Return only JSON: {"fullVoiceover":"...","scenes":[{"name":"...","seconds":6,"voiceover":"...","brollQuery":"..."}]}
+- Return only JSON: {"fullVoiceover":"...","scenes":[{"name":"...","seconds":6,"voiceover":"...","brollQuery":"...","caption":"...","useProductImage":false}]}
 - Provide exactly 5 scenes.`
   const response = await client.chat.completions.create({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 700 })
   const parsed = parseJson(response.choices[0]?.message?.content?.trim() || '')
@@ -210,7 +207,8 @@ Rules:
       seconds: Number(scene?.seconds || fallback[index]?.seconds || 6),
       voiceover: String(scene?.voiceover || fallback[index]?.voiceover || '').trim(),
       brollQuery: String(scene?.brollQuery || fallback[index]?.brollQuery || product.category),
-      useProductImage: index === 1 || index === 4
+      caption: String(scene?.caption || scene?.name || fallback[index]?.name || '').trim(),
+      useProductImage: Boolean(scene?.useProductImage) || index === 1 || index === 4
     }))
     return { fullVoiceover: String(parsed.fullVoiceover || scenes.map((s: CreativeScene) => s.voiceover || '').join(' ')), scenes }
   }
@@ -230,7 +228,18 @@ function pickEnv(keys: string[]): string {
   return ''
 }
 
-async function postToYouTube(videoUrl: string, title: string, description: string): Promise<string> {
+function isHttpUrl(value: string) {
+  return /^https?:\/\//i.test(String(value || ''))
+}
+
+function platformVideoUrl(videoFileOrUrl: string) {
+  if (isHttpUrl(videoFileOrUrl)) return videoFileOrUrl
+  const base = process.env.VIDEO_PUBLIC_URL_BASE?.replace(/\/$/, '') || ''
+  if (!base) return ''
+  return `${base}/${encodeURIComponent(path.basename(videoFileOrUrl))}`
+}
+
+async function postToYouTube(videoFileOrUrl: string, title: string, description: string): Promise<string> {
   const clientId = pickEnv(['YT_CLIENT_ID', 'YOUTUBE_CLIENT_ID'])
   const clientSecret = pickEnv(['YT_CLIENT_SECRET', 'YOUTUBE_CLIENT_SECRET'])
   const refreshToken = pickEnv(['YT_REFRESH_TOKEN', 'YOUTUBE_REFRESH_TOKEN'])
@@ -238,17 +247,21 @@ async function postToYouTube(videoUrl: string, title: string, description: strin
   const oauth2Client = new google.auth.OAuth2({ clientId, clientSecret })
   oauth2Client.setCredentials({ refresh_token: refreshToken })
   const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
-  const media = await axios.get(videoUrl, { responseType: 'stream', timeout: 120000 })
-  const upload = await youtube.videos.insert({ part: ['snippet', 'status'], requestBody: { snippet: { title: title.slice(0, 95), description, categoryId: '22' }, status: { privacyStatus: (process.env.YT_PRIVACY_STATUS as any) || 'public' } }, media: { body: media.data } })
+  const body = isHttpUrl(videoFileOrUrl)
+    ? (await axios.get(videoFileOrUrl, { responseType: 'stream', timeout: 120000 })).data
+    : fs.createReadStream(videoFileOrUrl)
+  const upload = await youtube.videos.insert({ part: ['snippet', 'status'], requestBody: { snippet: { title: title.slice(0, 95), description, categoryId: '22' }, status: { privacyStatus: (process.env.YT_PRIVACY_STATUS as any) || 'public' } }, media: { body } })
   const id = upload.data.id || ''
   if (!id) throw new Error('YouTube upload did not return video id')
   return id
 }
 
-async function postToInstagram(videoUrl: string, captionText: string): Promise<string> {
+async function postToInstagram(videoFileOrUrl: string, captionText: string): Promise<string> {
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN
   const igId = pickEnv(['INSTAGRAM_IG_ID', 'INSTAGRAM_USER_ID', 'INSTAGRAM_ACCOUNT_ID'])
   if (!accessToken || !igId) throw new Error('Missing Instagram access token or IG ID')
+  const videoUrl = platformVideoUrl(videoFileOrUrl)
+  if (!videoUrl) throw new Error('Instagram requires a public HTTPS video URL. Set VIDEO_PUBLIC_URL_BASE after uploading output/*.mp4 to a public host.')
   const apiVersion = process.env.INSTAGRAM_API_VERSION || 'v20.0'
   const host = process.env.INSTAGRAM_API_HOST || 'graph.facebook.com'
   const baseUrl = `https://${host}/${apiVersion}`
@@ -269,41 +282,102 @@ async function postToInstagram(videoUrl: string, captionText: string): Promise<s
   return mediaId
 }
 
-async function renderVideo(product: Product, scenePlan: any, profile: CreativeProfile): Promise<string> {
-  const provider = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase()
-  if (provider !== 'did') throw new Error(`Unsupported VIDEO_PROVIDER "${provider}". This scheduler is D-ID first.`)
-  const id = await createDidVideo(product, scenePlan, profile)
-  return await pollDidVideo(id)
+function localFootageCandidates(product: Product) {
+  if (!fs.existsSync(FOOTAGE_DIR)) return []
+  const files = fs.readdirSync(FOOTAGE_DIR)
+    .filter((f) => /\.(mp4|mov|mkv|webm|png|jpe?g|webp)$/i.test(f))
+    .map((f) => path.resolve(FOOTAGE_DIR, f))
+  const text = `${product.name} ${product.category} ${(product.keywords || []).join(' ')}`.toLowerCase()
+  return files.sort((a, b) => {
+    const score = (file: string) => {
+      const name = path.basename(file).toLowerCase()
+      let s = 0
+      if (/dog|pet|urine|odor|kennel/.test(text) && /dog|pet|urine|odor|lawn|grass/.test(name)) s += 6
+      if (/pasture|hay|field|farm|acre/.test(text) && /pasture|hay|field|farm|acre/.test(name)) s += 6
+      if (/compost|biochar|worm|soil|garden/.test(text) && /compost|biochar|worm|soil|garden|plant/.test(name)) s += 6
+      if (/spray|hose|before|after|product|bottle|jug/.test(name)) s += 3
+      return s
+    }
+    return score(b) - score(a)
+  })
+}
+
+async function collectSceneFiles(product: Product, scenePlan: any) {
+  ensureDir(OUTPUT_DIR)
+  ensureDir(TEMP_DIR)
+  ensureDir(FOOTAGE_DIR)
+  const productImage = await downloadProductImage(product, TEMP_DIR)
+  const sceneFiles: string[] = []
+  const local = localFootageCandidates(product)
+  for (const file of local.slice(0, 5)) sceneFiles.push(file)
+
+  for (const scene of scenePlan.scenes || []) {
+    if (sceneFiles.length >= 5) break
+    if (scene.useProductImage && productImage) {
+      sceneFiles.push(productImage)
+      continue
+    }
+    const query = scene.brollQuery || product.brollQueries?.[sceneFiles.length] || product.category
+    try {
+      const file = await downloadPexelsVideo(query, TEMP_DIR, sceneFiles.length)
+      if (file) sceneFiles.push(file)
+    } catch (error: any) {
+      log('B-roll download failed', { query, error: error?.message || error })
+    }
+  }
+
+  if (!sceneFiles.length && productImage) sceneFiles.push(productImage)
+  if (!sceneFiles.length) throw new Error('No b-roll or product images available. Add files to footage/, add productImageUrl, or configure PEXELS_API_KEY.')
+  return { sceneFiles, productImage }
+}
+
+function hookText(product: Product, scenePlan: any) {
+  const firstScene = scenePlan.scenes?.[0]
+  return String(firstScene?.caption || firstScene?.name || product.name).slice(0, 80).toUpperCase()
+}
+
+async function renderVideo(product: Product, scenePlan: any): Promise<string> {
+  const { sceneFiles, productImage } = await collectSceneFiles(product, scenePlan)
+  const sceneDurations = (scenePlan.scenes || []).map((scene: CreativeScene) => Number(scene.seconds || 6))
+  const videoFile = await composeVerticalAd({
+    outputName: `${safeFileName(product.name)}-scheduled.mp4`,
+    sceneFiles,
+    sceneDurations,
+    productImage,
+    captionText: hookText(product, scenePlan),
+    overlayText: productOverlayText(product)
+  })
+  log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage })
+  return videoFile
 }
 
 async function main() {
-  process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase()
+  process.env.VIDEO_STYLE = String(process.env.VIDEO_STYLE || 'broll_ken_burns').toLowerCase()
   await loadSecrets()
   const products = loadProducts()
   if (!products.length) throw new Error('No products configured')
   const { product, variationIndex, variationCount } = pickProduct(products)
   const profile = productCreativeProfile(product)
-  log('Scheduled product selected', { provider: process.env.VIDEO_PROVIDER, product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
-  log('Creative mapping selected', { didPresenterUrl: profile.didPresenterUrl || process.env.DID_DEFAULT_PRESENTER_URL || 'default', didVoiceId: profile.didVoiceId || process.env.DID_DEFAULT_VOICE_ID || 'default', hasScenePlan: !!profile.scenes?.length, hasProductImage: !!product.productImageUrl })
+  log('Scheduled product selected', { videoStyle: process.env.VIDEO_STYLE, product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
+  log('Creative mapping selected', { hasScenePlan: !!profile.scenes?.length, hasProductImage: !!product.productImageUrl, brollQueries: product.brollQueries?.length || 0 })
   const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount)
-  log('Generated scene plan', { fullVoiceoverLength: scenePlan.fullVoiceover.length, scenes: scenePlan.scenes.map((scene: CreativeScene, index: number) => ({ idx: index + 1, name: scene.name, seconds: scene.seconds, useProductImage: !!scene.useProductImage })) })
+  log('Generated scene plan', { fullVoiceoverLength: scenePlan.fullVoiceover.length, scenes: scenePlan.scenes.map((scene: CreativeScene, index: number) => ({ idx: index + 1, name: scene.name, seconds: scene.seconds, useProductImage: !!scene.useProductImage, brollQuery: scene.brollQuery })) })
   const captionText = caption(product, scenePlan.fullVoiceover)
   const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean)
   if (String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true') {
-    log('Dry run enabled; skipping D-ID render and social posting', { provider: process.env.VIDEO_PROVIDER, platforms, caption: captionText, voiceover: scenePlan.fullVoiceover })
+    log('Dry run enabled; skipping render and social posting', { videoStyle: process.env.VIDEO_STYLE, platforms, caption: captionText, voiceover: scenePlan.fullVoiceover })
     return
   }
-  const videoUrl = await renderVideo(product, scenePlan, profile)
-  log('Finished D-ID video URL', { videoUrl })
+  const videoFile = await renderVideo(product, scenePlan)
   let posted = 0
   if (platforms.includes('youtube')) {
-    try { const id = await postToYouTube(videoUrl, product.name, captionText); posted++; log('Posted to YouTube', { id }) } catch (error: any) { log('YouTube post failed', error?.message || error) }
+    try { const id = await postToYouTube(videoFile, product.name, captionText); posted++; log('Posted to YouTube', { id }) } catch (error: any) { log('YouTube post failed', error?.message || error) }
   }
   if (platforms.includes('instagram')) {
-    try { const id = await postToInstagram(videoUrl, captionText); posted++; log('Posted to Instagram', { id }) } catch (error: any) { log('Instagram post failed', error?.message || error) }
+    try { const id = await postToInstagram(videoFile, captionText); posted++; log('Posted to Instagram', { id }) } catch (error: any) { log('Instagram post failed', error?.message || error) }
   }
   if (posted === 0) throw new Error('No platform posts succeeded')
-  log('Scheduled post completed', { posted })
+  log('Scheduled post completed', { posted, videoFile })
 }
 
 main().catch((error) => { console.error('Scheduled post failed:', error?.message || error); process.exit(1) })
