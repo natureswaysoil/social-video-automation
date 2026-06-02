@@ -5,6 +5,8 @@
   "license": "UNLICENSED",
   "description": "Nature's Way Soil scheduled product video generation and social posting automation.",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start:cloudrun": "NODE_OPTIONS=--max-old-space-size=2048 VIDEO_STYLE=broll_ken_burns node dist/post-scheduled.js",
     "post:scheduled": "NODE_OPTIONS=--max-old-space-size=2048 VIDEO_STYLE=broll_ken_burns ts-node --transpile-only scripts/post-scheduled.ts",
     "test:dry": "NODE_OPTIONS=--max-old-space-size=2048 DRY_RUN_LOG_ONLY=true VIDEO_STYLE=broll_ken_burns ts-node --transpile-only scripts/post-scheduled.ts",
     "test:creative": "VIDEO_PROVIDER=did ts-node --transpile-only scripts/test-creative-video.ts",
