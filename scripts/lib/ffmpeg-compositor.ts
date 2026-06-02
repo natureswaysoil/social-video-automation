@@ -25,7 +25,7 @@ function makeSceneClip(file: string, index: number, seconds: number, outputDir: 
   if (isImage(file)) {
     const direction = index % 2 === 0
       ? "zoompan=z='min(zoom+0.0018,1.16)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-      : "zoompan=z='min(zoom+0.0015,1.14)':x='(iw-iw/zoom)*on/${frames}':y='ih/2-(ih/zoom/2)'"
+      : `zoompan=z='min(zoom+0.0015,1.14)':x='(iw-iw/zoom)*on/${frames}':y='ih/2-(ih/zoom/2)'`
 
     execSync([
       'ffmpeg -y',
