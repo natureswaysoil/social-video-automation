@@ -63,6 +63,8 @@ if gcloud run jobs describe "$JOB_NAME" --project="$PROJECT_ID" --region="$REGIO
     --cpu="$JOB_CPU" \
     --task-timeout=3600s \
     --max-retries=0 \
+    --command=node \
+    --args="--max-old-space-size=${NODE_HEAP_MB},dist/post-scheduled.js" \
     --env-vars-file="$ENV_FILE"
 else
   gcloud run jobs create "$JOB_NAME" \
@@ -74,6 +76,8 @@ else
     --cpu="$JOB_CPU" \
     --task-timeout=3600s \
     --max-retries=0 \
+    --command=node \
+    --args="--max-old-space-size=${NODE_HEAP_MB},dist/post-scheduled.js" \
     --env-vars-file="$ENV_FILE"
 fi
 
