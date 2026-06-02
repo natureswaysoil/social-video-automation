@@ -32,6 +32,17 @@ VARIATIONS_PER_PRODUCT: "5"
 ROTATION_STATE_FILE: "data/rotation-state.json"
 EOF
 
+printf '\nGranting service account access needed by the job.\n'
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/secretmanager.secretAccessor" \
+  --quiet >/dev/null
+
+gcloud storage buckets add-iam-policy-binding gs://natureswaysoil-social-videos \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/storage.objectAdmin" \
+  --quiet >/dev/null || true
+
 printf '\nBuilding image: %s\n' "$IMAGE"
 gcloud builds submit \
   --project="$PROJECT_ID" \
