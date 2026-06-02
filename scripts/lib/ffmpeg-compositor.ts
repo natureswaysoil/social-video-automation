@@ -29,11 +29,12 @@ function makeSceneClip(file: string, index: number, seconds: number, outputDir: 
 
     execSync([
       'ffmpeg -y',
-      `-loop 1 -t ${duration}`,
+      '-loop 1',
       `-i "${file}"`,
       `-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${direction}:d=${frames}:s=1080x1920:fps=30,format=yuv420p"`,
       '-an',
       '-r 30',
+      `-frames:v ${frames}`,
       `"${clip}"`
     ].join(' '), { stdio: 'inherit' })
     return clip
