@@ -14,7 +14,7 @@ function shellEscapeText(value: string) {
 }
 
 function isImage(file: string) {
-  return /\.(png|jpe?g|webp)$/i.test(file)
+  return /\.(png|jpe?g|webp|svg)$/i.test(file)
 }
 
 function makeSceneClip(file: string, index: number, seconds: number, outputDir: string) {
