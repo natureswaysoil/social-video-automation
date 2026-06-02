@@ -12,6 +12,7 @@ RUN npm install
 COPY . .
 
 ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=2048
 ENV VIDEO_STYLE=broll_ken_burns
 ENV GCS_PUBLIC_BUCKET=natureswaysoil-social-videos
 ENV VIDEO_PUBLIC_BUCKET=natureswaysoil-social-videos
@@ -20,4 +21,4 @@ ENV ENABLE_PLATFORMS=youtube,instagram,facebook
 ENV YT_PRIVACY_STATUS=public
 ENV DRY_RUN_LOG_ONLY=false
 
-CMD ["npm", "run", "post:scheduled"]
+CMD ["node", "--max-old-space-size=2048", "-r", "ts-node/register/transpile-only", "scripts/post-scheduled.ts"]
