@@ -6,6 +6,7 @@ import { ensureDir, safeFileName } from './video-utils'
 
 const ROOT = process.cwd()
 const PRODUCT_ASSET_DIR = path.resolve(ROOT, 'assets/products')
+const DEFAULT_SITE_BASE_URL = 'https://www.natureswaysoil.com'
 
 export function localProductImage(product: any) {
   const candidates = [
@@ -17,15 +18,33 @@ export function localProductImage(product: any) {
   return candidates.find((file) => fs.existsSync(file)) || ''
 }
 
+function productImageSource(product: any) {
+  const source = product.productImageUrl || product.imageUrl || product.amazonImageUrl || product.productImagePath || product.imagePath || ''
+  if (!source) return ''
+  if (/^https?:\/\//i.test(source)) return source
+  if (String(source).startsWith('/')) {
+    const base = (process.env.PRODUCT_IMAGE_BASE_URL || DEFAULT_SITE_BASE_URL).replace(/\/$/, '')
+    return `${base}${source}`
+  }
+  return source
+}
+
+function imageExtension(url: string) {
+  const clean = String(url || '').split('?')[0].toLowerCase()
+  if (clean.endsWith('.png')) return 'png'
+  if (clean.endsWith('.webp')) return 'webp'
+  return 'jpg'
+}
+
 export async function downloadProductImage(product: any, outputDir: string) {
   const local = localProductImage(product)
   if (local) return local
 
-  const url = product.productImageUrl || product.imageUrl || product.amazonImageUrl || ''
+  const url = productImageSource(product)
   if (!url) return ''
 
   ensureDir(outputDir)
-  const ext = url.toLowerCase().includes('.png') ? 'png' : 'jpg'
+  const ext = imageExtension(url)
   const output = path.resolve(outputDir, `product-${product.id}.${ext}`)
 
   const response = await axios.get(url, { responseType: 'stream', timeout: 60000 })
