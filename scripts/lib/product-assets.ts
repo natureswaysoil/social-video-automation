@@ -18,13 +18,26 @@ export function localProductImage(product: any) {
   return candidates.find((file) => fs.existsSync(file)) || ''
 }
 
+function encodeUrlPath(url: string) {
+  try {
+    const parsed = new URL(url)
+    parsed.pathname = parsed.pathname
+      .split('/')
+      .map((part) => encodeURIComponent(decodeURIComponent(part)))
+      .join('/')
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}
+
 function productImageSource(product: any) {
   const source = product.productImageUrl || product.imageUrl || product.amazonImageUrl || product.productImagePath || product.imagePath || ''
   if (!source) return ''
-  if (/^https?:\/\//i.test(source)) return source
+  if (/^https?:\/\//i.test(source)) return encodeUrlPath(source)
   if (String(source).startsWith('/')) {
     const base = (process.env.PRODUCT_IMAGE_BASE_URL || DEFAULT_SITE_BASE_URL).replace(/\/$/, '')
-    return `${base}${source}`
+    return encodeUrlPath(`${base}${source}`)
   }
   return source
 }
@@ -47,14 +60,24 @@ export async function downloadProductImage(product: any, outputDir: string) {
   const ext = imageExtension(url)
   const output = path.resolve(outputDir, `product-${product.id}.${ext}`)
 
-  const response = await axios.get(url, { responseType: 'stream', timeout: 60000 })
-  await new Promise((resolve, reject) => {
-    const writer = fs.createWriteStream(output)
-    response.data.pipe(writer)
-    writer.on('finish', resolve)
-    writer.on('error', reject)
-  })
-  return output
+  try {
+    const response = await axios.get(url, { responseType: 'stream', timeout: 60000 })
+    await new Promise((resolve, reject) => {
+      const writer = fs.createWriteStream(output)
+      response.data.pipe(writer)
+      writer.on('finish', resolve)
+      writer.on('error', reject)
+    })
+    return output
+  } catch (error: any) {
+    console.log('Product image skipped; falling back to b-roll', {
+      productId: product.id,
+      source: url,
+      error: error?.response?.status || error?.message || error
+    })
+    try { if (fs.existsSync(output)) fs.unlinkSync(output) } catch {}
+    return ''
+  }
 }
 
 export function productOverlayText(product: any) {
