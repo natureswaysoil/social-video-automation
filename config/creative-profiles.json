@@ -1,21 +1,63 @@
 {
   "defaults": {
-    "avatarId": "Amanda_in_Blue_Shirt_Front",
-    "voiceId": "ybOJaAgPlBdcGBEpCJzA",
-    "avatarScale": 0.46,
-    "avatarOffsetY": 0.18,
-    "tone": "plainspoken, helpful, trusted small family farm brand",
-    "format": "25-35 second vertical short",
+    "tone": "plainspoken, practical, trusted small family farm brand",
+    "format": "25-30 second vertical short",
     "cta": "See the full product details at Nature's Way Soil."
   },
   "profiles": {
+    "NWS_023": {
+      "audience": "landowners, hay producers, pasture managers, horse owners, cattle owners, and rural homeowners with stressed grass",
+      "angle": "premium liquid biochar pasture and lawn recovery support for soil, root zone, and large acreage use",
+      "tone": "rural, direct, no hype, no goofy visuals, no fake before-and-after claims",
+      "cta": "See the Hay, Pasture & Lawn Recovery System at Nature's Way Soil.",
+      "hooks": [
+        "Tired pasture does not need a gimmick — it needs root-zone and soil support.",
+        "For hay, pasture, and lawn recovery, start below the grass blade.",
+        "Large acreage grass problems usually start in the soil."
+      ],
+      "scenes": [
+        {
+          "name": "Stressed Pasture Problem",
+          "seconds": 6,
+          "voiceover": "If your hay field, pasture, or lawn looks tired, the problem may be deeper than the leaf blade.",
+          "brollQuery": "dry pasture grass field",
+          "caption": "TIRED PASTURE?"
+        },
+        {
+          "name": "Product System",
+          "seconds": 6,
+          "voiceover": "Nature's Way Soil Hay, Pasture and Lawn Recovery System is built around liquid biochar, humic and fulvic acids, kelp, yucca, and beneficial biology.",
+          "brollQuery": "liquid fertilizer jug on farm grass",
+          "caption": "LIQUID BIOCHAR SYSTEM",
+          "useProductImage": true
+        },
+        {
+          "name": "Field Application",
+          "seconds": 6,
+          "voiceover": "Apply it as a soil-focused liquid program for acreage, pasture, hay ground, and larger lawn areas.",
+          "brollQuery": "tractor spraying pasture field",
+          "caption": "BUILT FOR ACREAGE"
+        },
+        {
+          "name": "Root Zone Support",
+          "seconds": 6,
+          "voiceover": "The goal is better root-zone support, soil conditioning, and nutrient movement — not a temporary green dye.",
+          "brollQuery": "healthy grass roots soil close up",
+          "caption": "ROOT-ZONE SUPPORT"
+        },
+        {
+          "name": "CTA",
+          "seconds": 5,
+          "voiceover": "For use rates and product details, visit Nature's Way Soil or shop direct online.",
+          "brollQuery": "green hay field pasture sunset",
+          "caption": "SHOP NATURE'S WAY SOIL",
+          "useProductImage": true
+        }
+      ]
+    },
     "NWS_014": {
-      "avatarId": "Amanda_Maintenance_Front",
-      "voiceId": "6895c76b6f624e65b81e74671358d95b",
       "audience": "dog owners with yellow lawn spots, pet areas, kennels, patios, and turf runs",
       "angle": "soil-first lawn recovery instead of green dye or cover-up",
-      "avatarScale": 0.44,
-      "avatarOffsetY": 0.2,
       "tone": "friendly pet owner, practical lawn help, clear CTA, no overpromising",
       "cta": "For the lawn repair directions, visit Nature's Way Soil.",
       "hooks": [
@@ -31,12 +73,8 @@
       ]
     },
     "NWS_011": {
-      "avatarId": "Amanda_in_Blue_Shirt_Front",
-      "voiceId": "ybOJaAgPlBdcGBEpCJzA",
       "audience": "gardeners and lawn owners dealing with tired soil, nutrient lockout, and weak roots",
       "angle": "humic, fulvic, and kelp support the root zone and nutrient movement",
-      "avatarScale": 0.46,
-      "avatarOffsetY": 0.18,
       "tone": "soil educator, clear, credible, clear CTA, no overpromising",
       "cta": "Learn more at Nature's Way Soil.",
       "hooks": [
@@ -52,12 +90,8 @@
       ]
     },
     "NWS_013": {
-      "avatarId": "Amanda_in_Grey_Shirt_Front",
-      "voiceId": "ybOJaAgPlBdcGBEpCJzA",
       "audience": "raised bed, container, and garden growers who want a concentrated soil amendment",
       "angle": "worm castings, biochar, compost, and duckweed extract for living soil support",
-      "avatarScale": 0.46,
-      "avatarOffsetY": 0.18,
       "tone": "warm family farm, soil-building focus, clear CTA, no overpromising",
       "cta": "See how to use it at Nature's Way Soil.",
       "hooks": [
@@ -73,12 +107,8 @@
       ]
     },
     "NWS_021": {
-      "avatarId": "Albert_public_3",
-      "voiceId": "3o5awrz3sR3uP9rxaD80",
       "audience": "landowners, small farms, horse owners, cattle owners, hay and pasture managers",
       "angle": "liquid pasture and lawn support for stronger-looking grass and better soil support",
-      "avatarScale": 0.42,
-      "avatarOffsetY": 0.22,
       "tone": "rural, practical, no-nonsense, clear CTA, no overpromising",
       "cta": "For hay and pasture use directions, visit Nature's Way Soil.",
       "hooks": [
@@ -94,12 +124,8 @@
       ]
     },
     "NWS_018": {
-      "avatarId": "Albert_public_3",
-      "voiceId": "3o5awrz3sR3uP9rxaD80",
       "audience": "homeowners wanting greener turf and better root-zone support",
       "angle": "seaweed extract plus humic acid for turf and soil support",
-      "avatarScale": 0.44,
-      "avatarOffsetY": 0.2,
       "tone": "clean lawn-care educator, premium but simple, clear CTA, no overpromising",
       "cta": "See the lawn treatment details at Nature's Way Soil.",
       "hooks": [
