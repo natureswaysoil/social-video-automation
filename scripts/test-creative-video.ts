@@ -14,12 +14,10 @@ const STATE_FILE = path.resolve(ROOT, 'data/creative-test-state.json')
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
   'OPENAI_MODEL',
-  'HEYGEN_API_KEY',
   'DID_API_KEY',
   'DiD',
-  'PEXELS_API_KEY',
-  'HEYGEN_DEFAULT_AVATAR',
-  'HEYGEN_DEFAULT_VOICE'
+  'DID_VOICE_ID',
+  'DID_SOURCE_URL',
 ]
 
 function log(message: string, data?: any) { data === undefined ? console.log(message) : console.log(message, data) }
@@ -141,131 +139,73 @@ Format:
   }
 }
 
-async function pexels(query: string) {
-  if (!process.env.PEXELS_API_KEY) return ''
+async function createVideo(product: any, creative: any, fullVoiceover: string) {
+  const rawKey = process.env.DiD || process.env.DID_API_KEY
+  if (!rawKey) throw new Error('No D-ID API key found (DiD or DID_API_KEY)')
+  const encoded = Buffer.from(`${rawKey}:`).toString('base64')
 
-  const res = await axios.get('https://api.pexels.com/videos/search', {
-    headers: { Authorization: process.env.PEXELS_API_KEY },
-    params: {
-      query,
-      orientation: 'portrait',
-      per_page: 10
-    },
-    timeout: 30000
-  })
-
-  const videos = res.data?.videos || []
-
-  const ranked = videos
-    .map((video: any) => {
-      const files = video?.video_files || []
-      const portrait = files.find((f: any) => Number(f.height || 0) > Number(f.width || 0))
-      return {
-        id: video?.id,
-        duration: video?.duration || 0,
-        width: portrait?.width || 0,
-        height: portrait?.height || 0,
-        url: portrait?.link || files?.[0]?.link || ''
-      }
-    })
-    .filter((v: any) => v.url)
-    .sort((a: any, b: any) => (b.height * b.width) - (a.height * a.width))
-
-  const best = ranked[0]
-
-  log('Selected enhanced Pexels clip', {
-    query,
-    videoId: best?.id,
-    resolution: `${best?.width}x${best?.height}`
-  })
-
-  return best?.url || ''
-}
-
-async function createVideo(product: any, creative: any, scenes: any[]) {
-  const avatar = process.env.HEYGEN_DEFAULT_AVATAR || creative.avatarId || 'Daisy-inskirt-20220818'
-  const voice = process.env.HEYGEN_DEFAULT_VOICE || creative.voiceId || '2d5b0e6cf36f460aa7fc47e3eee4ba54'
-  const scale = Number(process.env.HEYGEN_AVATAR_SCALE || creative.avatarScale || 0.48)
-  const offsetY = Number(process.env.HEYGEN_AVATAR_OFFSET_Y || creative.avatarOffsetY || 0.16)
-
-  const inputs = []
-
-  for (const scene of scenes) {
-    const brollUrl = await pexels(scene.brollQuery)
-
-    inputs.push({
-      character: {
-        type: 'avatar',
-        avatar_id: avatar,
-        avatar_style: 'normal',
-        scale,
-        offset: { x: 0, y: offsetY }
-      },
-      voice: {
-        type: 'text',
-        input_text: scene.voiceover,
-        voice_id: voice,
-        speed: 1.0
-      },
-      background: brollUrl
-        ? { type: 'video', url: brollUrl, play_style: 'fit_to_scene' }
-        : { type: 'color', value: '#0a3d0a' }
-    })
-  }
+  const sourceUrl = process.env.DID_SOURCE_URL ||
+    'https://create-images-results.d-id.com/DefaultPresenters/Noelle_f/image.jpeg'
+  const voiceId = process.env.DID_VOICE_ID || 'en-US-JennyNeural'
 
   const res = await axios.post(
-    'https://api.heygen.com/v2/video/generate',
+    'https://api.d-id.com/talks',
     {
-      video_inputs: inputs,
-      dimension: { width: 720, height: 1280 },
-      title: product.name
+      source_url: sourceUrl,
+      script: {
+        type: 'text',
+        input: fullVoiceover,
+        provider: { type: 'microsoft', voice_id: voiceId }
+      },
+      config: { fluent: true, pad_audio: 0 }
     },
     {
       headers: {
-        'X-Api-Key': process.env.HEYGEN_API_KEY,
+        Authorization: `Basic ${encoded}`,
         'Content-Type': 'application/json'
       },
-      timeout: 120000
+      timeout: 60000
     }
   )
 
-  const videoId = res.data?.data?.video_id || res.data?.video_id
+  const jobId = res.data?.id
+  if (!jobId) throw new Error('D-ID did not return a job ID')
 
   log('Creative video job created', {
-    provider: 'HeyGen',
+    provider: 'D-ID',
     product: product.name,
-    videoId,
-    sceneCount: inputs.length
+    jobId,
+    voiceId
   })
 
-  return videoId
+  return jobId
 }
 
-async function poll(videoId: string) {
-  for (let i = 0; i < 100; i++) {
-    const res = await axios.get('https://api.heygen.com/v1/video_status.get', {
-      headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY },
-      params: { video_id: videoId },
+async function poll(jobId: string) {
+  const rawKey = process.env.DiD || process.env.DID_API_KEY
+  const encoded = Buffer.from(`${rawKey}:`).toString('base64')
+
+  for (let i = 0; i < 60; i++) {
+    const res = await axios.get(`https://api.d-id.com/talks/${jobId}`, {
+      headers: { Authorization: `Basic ${encoded}` },
       timeout: 60000
     })
 
-    const data = res.data?.data || res.data
-    const status = String(data?.status || '').toLowerCase()
+    const status = String(res.data?.status || '').toLowerCase()
+    log('Video render status', { jobId, status })
 
-    log('Video render status', { videoId, status })
-
-    if ((status.includes('complete') || status === 'success') && data.video_url) {
-      return data.video_url
+    if ((status === 'done' || status.includes('complet')) && res.data.result_url) {
+      return res.data.result_url
     }
 
     if (status.includes('fail') || status === 'error') {
-      throw new Error(data.error || data.error_message || 'Video generation failed')
+      throw new Error(res.data?.error?.description || res.data?.error || 'D-ID video generation failed')
     }
 
-    await new Promise(r => setTimeout(r, 15000))
+    await new Promise(r => setTimeout(r, 10000))
   }
 
-  throw new Error('Timed out waiting for video render')
+  throw new Error('Timed out waiting for D-ID video render')
 }
 
 async function main() {
@@ -288,8 +228,8 @@ async function main() {
     text: s.voiceover
   })))
 
-  const videoId = await createVideo(product, creative, generated.scenes)
-  const videoUrl = await poll(videoId)
+  const jobId = await createVideo(product, creative, generated.fullVoiceover)
+  const videoUrl = await poll(jobId)
 
   log('Finished creative video URL', { videoUrl })
 }
