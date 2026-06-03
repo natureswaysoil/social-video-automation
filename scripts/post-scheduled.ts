@@ -56,6 +56,7 @@ const CREATIVE_PATH = path.resolve(ROOT, 'config/creative-profiles.json')
 const OUTPUT_DIR = path.resolve(ROOT, 'output')
 const TEMP_DIR = path.resolve(ROOT, 'temp-scheduled')
 const FOOTAGE_DIR = path.resolve(ROOT, process.env.FOOTAGE_DIR || 'footage')
+const DEFAULT_PUBLIC_VIDEO_BUCKET = 'natureswaysoil-social-videos'
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
 
 const SECRET_NAMES = [
@@ -147,7 +148,9 @@ function loadProducts(): Product[] {
 
 function pickProduct(products: Product[]) {
   const state = readJson(STATE_PATH, { ...DEFAULT_STATE })
-  const nextCursor = (Number(state.cursor || -1) + 1) % products.length
+  const preferredId = process.env.NEXT_PRODUCT_PREFERRED_ID?.trim()
+  const preferredIndex = preferredId ? products.findIndex((p) => p.id === preferredId) : -1
+  const nextCursor = preferredIndex >= 0 ? preferredIndex : (Number(state.cursor || -1) + 1) % products.length
   const product = products[nextCursor]
   const variationCount = Number(process.env.VARIATIONS_PER_PRODUCT || 5)
   const lastVariation = state.variationByProduct?.[product.id]
@@ -165,14 +168,35 @@ function productCreativeProfile(product: Product): CreativeProfile {
   return { ...(creative.defaults || {}), ...((creative.profiles || {})[product.id] || {}) }
 }
 
+function firstQuery(scene: CreativeScene, fallback: string) {
+  if (scene.brollQuery) return scene.brollQuery
+  if (Array.isArray(scene.brollQueries) && scene.brollQueries.length) return scene.brollQueries[0]
+  return fallback
+}
+
+function curatedScenePlan(product: Product, profile: CreativeProfile): { fullVoiceover: string, scenes: CreativeScene[] } | null {
+  if (!Array.isArray(profile.scenes) || !profile.scenes.length) return null
+  const scenes = profile.scenes.slice(0, 5).map((scene, index) => ({
+    name: scene.name || `scene-${index + 1}`,
+    seconds: Number(scene.seconds || 6),
+    voiceover: scene.voiceover || '',
+    brollQuery: firstQuery(scene, product.brollQueries?.[index] || product.category),
+    caption: scene.caption || scene.name || product.name,
+    useProductImage: Boolean(scene.useProductImage) || index === 1 || index === profile.scenes!.length - 1
+  }))
+  const fallbackVoice = `${profile.hooks?.[0] || product.name}. ${product.description} ${profile.cta || 'Shop Nature\'s Way Soil direct or on Amazon.'}`
+  const voiceover = scenes.map((scene) => scene.voiceover).filter(Boolean).join(' ') || fallbackVoice
+  return { fullVoiceover: voiceover, scenes }
+}
+
 function fallbackScenes(product: Product, profile: CreativeProfile): CreativeScene[] {
   const base = product.brollQueries?.length ? product.brollQueries : [product.category]
   return [
-    { name: 'Hook / Problem', seconds: 5, voiceover: `${profile.hooks?.[0] || 'Your lawn or soil problem may start below the surface.'}`, brollQuery: base[0] || product.category },
-    { name: 'Product Hero', seconds: 5, voiceover: `${product.name} is designed to support healthier soil and stronger-looking growth.`, brollQuery: base[1] || product.name, useProductImage: true },
+    { name: 'Problem', seconds: 5, voiceover: `${profile.hooks?.[0] || 'Your lawn or soil problem may start below the surface.'}`, brollQuery: base[0] || product.category },
+    { name: 'Product', seconds: 5, voiceover: `${product.name} is designed to support healthier soil and stronger-looking growth.`, brollQuery: base[1] || product.name, useProductImage: true },
     { name: 'Application', seconds: 6, voiceover: 'Use it as part of your regular lawn, garden, pasture, or soil care routine according to label directions.', brollQuery: base[2] || 'spraying lawn' },
-    { name: 'Soil Benefit', seconds: 6, voiceover: 'The goal is better soil support, root-zone activity, and nutrient availability.', brollQuery: base[3] || 'healthy soil close up' },
-    { name: 'Result / CTA', seconds: 6, voiceover: profile.cta || `Shop Nature's Way Soil direct or on Amazon.`, brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
+    { name: 'Field Result', seconds: 6, voiceover: 'The goal is better soil support, root-zone activity, and nutrient availability.', brollQuery: base[3] || 'healthy soil close up' },
+    { name: 'CTA', seconds: 6, voiceover: profile.cta || `Shop Nature's Way Soil direct or on Amazon.`, brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
   ]
 }
 
@@ -185,10 +209,13 @@ function parseJson(text: string): any {
 }
 
 async function generateScenePlan(product: Product, profile: CreativeProfile, variationIndex: number, variationCount: number): Promise<{ fullVoiceover: string, scenes: CreativeScene[] }> {
+  const curated = curatedScenePlan(product, profile)
+  if (curated) return curated
   const fallback = fallbackScenes(product, profile)
+  if (String(process.env.USE_OPENAI_SCENE_PLAN || 'false').toLowerCase() !== 'true') return { fullVoiceover: fallback.map(s => s.voiceover || '').join(' '), scenes: fallback }
   if (!hasValue('OPENAI_API_KEY')) return { fullVoiceover: fallback.map(s => s.voiceover || '').join(' '), scenes: fallback }
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  const prompt = `Create a high-retention 25-35 second vertical product video script for Nature's Way Soil.
+  const prompt = `Create a practical 25-30 second vertical product video script for Nature's Way Soil.
 Product: ${product.name}
 Description: ${product.description}
 Category: ${product.category}
@@ -198,15 +225,15 @@ Audience: ${profile.audience || 'homeowners, gardeners, lawn care, land owners'}
 Angle: ${profile.angle || 'soil-first product explanation'}
 Tone: ${profile.tone || 'plainspoken and practical'}
 Rules:
-- Strong first 3 seconds.
-- Use b-roll and product-image visuals, not a talking-head avatar.
+- No fantasy visuals, no cartoons, no "animation highlighting ingredients", no screen recordings.
+- Use realistic farm, lawn, soil, sprayer, pasture, garden, and product visuals only.
 - No guaranteed results.
 - No pesticide, disease, or cure claims.
 - Product should be visible by scene 2.
 - End with a direct CTA.
 - Return only JSON: {"fullVoiceover":"...","scenes":[{"name":"...","seconds":6,"voiceover":"...","brollQuery":"...","caption":"...","useProductImage":false}]}
 - Provide exactly 5 scenes.`
-  const response = await client.chat.completions.create({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 700 })
+  const response = await client.chat.completions.create({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.25, max_tokens: 700 })
   const parsed = parseJson(response.choices[0]?.message?.content?.trim() || '')
   if (parsed?.scenes?.length) {
     const scenes = parsed.scenes.slice(0, 5).map((scene: any, index: number) => ({
@@ -240,7 +267,7 @@ function isHttpUrl(value: string) {
 }
 
 function publicBucketName() {
-  return pickEnv(['GCS_PUBLIC_BUCKET', 'VIDEO_PUBLIC_BUCKET'])
+  return pickEnv(['GCS_PUBLIC_BUCKET', 'VIDEO_PUBLIC_BUCKET']) || DEFAULT_PUBLIC_VIDEO_BUCKET
 }
 
 function publicBucketUrlBase(bucket: string) {
@@ -251,7 +278,6 @@ function publicBucketUrlBase(bucket: string) {
 async function uploadVideoForSocial(videoFileOrUrl: string): Promise<string> {
   if (isHttpUrl(videoFileOrUrl)) return videoFileOrUrl
   const bucketName = publicBucketName()
-  if (!bucketName) throw new Error('Missing GCS_PUBLIC_BUCKET or VIDEO_PUBLIC_BUCKET. This is required for Instagram/Facebook public video URLs.')
   const storage = new Storage()
   const objectName = `social-videos/${Date.now()}-${safeFileName(path.basename(videoFileOrUrl), 'mp4')}`
   await storage.bucket(bucketName).upload(videoFileOrUrl, {
