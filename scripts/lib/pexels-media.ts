@@ -4,6 +4,33 @@ import fs from 'fs'
 import path from 'path'
 import { ensureDir, safeFileName } from './video-utils'
 
+const PEXELS_VIDEO_API = 'https://api.pexels.com/videos/search'
+const PEXELS_PHOTO_API = 'https://api.pexels.com/v1/search'
+
+function trimQuery(query: string, words = 4) {
+  return String(query || '').split(/\s+/).filter(Boolean).slice(0, words).join(' ')
+}
+
+/**
+ * Build the search attempts for a query. We keep the attempts CLOSE to the
+ * product (full query -> trimmed query) and only fall back to a generic term
+ * as a last resort. Previously the chain degraded straight to "green lawn",
+ * which is the main reason b-roll looked generic and unrelated to the product.
+ */
+function videoAttempts(query: string) {
+  const q = String(query || '').trim()
+  const short = trimQuery(q, 3)
+  return [
+    { query: q, orientation: 'portrait' },
+    { query: q, orientation: 'landscape' },
+    short !== q ? { query: short, orientation: 'portrait' } : null,
+    short !== q ? { query: short, orientation: 'landscape' } : null
+  ].filter(Boolean)
+}
+
+// ---------------------------------------------------------------------------
+// VIDEO b-roll
+// ---------------------------------------------------------------------------
 export async function findPexelsVideoUrl(query: string) {
   const key = process.env.PEXELS_API_KEY
   if (!key) {
@@ -11,57 +38,84 @@ export async function findPexelsVideoUrl(query: string) {
     return ''
   }
 
-  const attempts = [
-    { query, orientation: 'portrait' },
-    { query, orientation: 'landscape' },
-    { query: query.split(' ').slice(0, 3).join(' '), orientation: 'portrait' },
-    { query: 'green lawn', orientation: 'portrait' },
-    { query: 'spraying lawn', orientation: 'landscape' }
-  ]
-
-  for (const attempt of attempts) {
+  for (const attempt of videoAttempts(query)) {
     try {
-      const response = await axios.get('https://api.pexels.com/videos/search', {
+      const response = await axios.get(PEXELS_VIDEO_API, {
         headers: { Authorization: key },
         params: { query: attempt.query, orientation: attempt.orientation, per_page: 15 },
         timeout: 30000
       })
-
       const videos = Array.isArray(response.data?.videos) ? response.data.videos : []
-      console.log('Pexels search result', { query: attempt.query, orientation: attempt.orientation, count: videos.length })
+      console.log('Pexels video search', { query: attempt.query, orientation: attempt.orientation, count: videos.length })
 
+      // Prefer real portrait clips at a sane resolution (>=720 wide, <=2160),
+      // so we don't grab a 4K landscape file and hard-crop it to a sliver.
       const ranked = videos
         .map((video: any) => {
           const files = video.video_files || []
-          const portrait = files.find((file: any) => Number(file.height || 0) > Number(file.width || 0))
-          const best = portrait || files.sort((a: any, b: any) => (Number(b.width || 0) * Number(b.height || 0)) - (Number(a.width || 0) * Number(a.height || 0)))[0]
-          return { id: video.id, url: best?.link || '', width: best?.width || 0, height: best?.height || 0 }
+          const portrait = files
+            .filter((f: any) => Number(f.height || 0) >= Number(f.width || 0))
+            .sort((a: any, b: any) => Math.abs(1080 - Number(a.width || 0)) - Math.abs(1080 - Number(b.width || 0)))[0]
+          const any = files.sort((a: any, b: any) => Math.abs(1080 - Number(a.width || 0)) - Math.abs(1080 - Number(b.width || 0)))[0]
+          const best = portrait || any
+          return { id: video.id, url: best?.link || '', width: best?.width || 0, height: best?.height || 0, isPortrait: !!portrait }
         })
         .filter((item: any) => item.url)
-        .sort((a: any, b: any) => (b.width * b.height) - (a.width * a.height))
+        // portrait first, then closeness to 1080 wide
+        .sort((a: any, b: any) => (Number(b.isPortrait) - Number(a.isPortrait)) || (Math.abs(1080 - a.width) - Math.abs(1080 - b.width)))
 
-      const selected = ranked[0]
-      if (selected) {
-        console.log('Selected Pexels compositor clip', { query: attempt.query, videoId: selected.id, resolution: `${selected.width}x${selected.height}` })
-        return selected.url
+      if (ranked[0]) {
+        console.log('Selected Pexels video', { query: attempt.query, id: ranked[0].id, res: `${ranked[0].width}x${ranked[0].height}`, portrait: ranked[0].isPortrait })
+        return ranked[0].url
       }
     } catch (error: any) {
-      console.log('Pexels search failed', {
-        query: attempt.query,
-        orientation: attempt.orientation,
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message
-      })
+      console.log('Pexels video search failed', { query: attempt.query, status: error?.response?.status, message: error?.message })
     }
   }
+  return ''
+}
 
+// ---------------------------------------------------------------------------
+// PHOTO b-roll (used for Ken Burns scenes)
+// ---------------------------------------------------------------------------
+export async function findPexelsPhotoUrl(query: string) {
+  const key = process.env.PEXELS_API_KEY
+  if (!key) {
+    console.log('Pexels skipped: missing PEXELS_API_KEY')
+    return ''
+  }
+
+  const attempts = [
+    { query: String(query || '').trim(), orientation: 'portrait' },
+    { query: trimQuery(query, 3), orientation: 'portrait' },
+    { query: String(query || '').trim(), orientation: 'landscape' }
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      const response = await axios.get(PEXELS_PHOTO_API, {
+        headers: { Authorization: key },
+        params: { query: attempt.query, orientation: attempt.orientation, per_page: 15 },
+        timeout: 30000
+      })
+      const photos = Array.isArray(response.data?.photos) ? response.data.photos : []
+      console.log('Pexels photo search', { query: attempt.query, orientation: attempt.orientation, count: photos.length })
+      const first = photos[0]
+      // large2x (~1880px) is plenty for a 1080x1920 Ken Burns frame; original is huge.
+      const url = first?.src?.large2x || first?.src?.original || first?.src?.large || ''
+      if (url) {
+        console.log('Selected Pexels photo', { query: attempt.query, id: first?.id })
+        return url
+      }
+    } catch (error: any) {
+      console.log('Pexels photo search failed', { query: attempt.query, status: error?.response?.status, message: error?.message })
+    }
+  }
   return ''
 }
 
 export async function downloadUrl(url: string, outputFile: string) {
   ensureDir(path.dirname(outputFile))
-  console.log('Downloading video asset', { outputFile })
   const response = await axios.get(url, { responseType: 'stream', timeout: 120000 })
   await new Promise((resolve, reject) => {
     const writer = fs.createWriteStream(outputFile)
@@ -75,6 +129,14 @@ export async function downloadUrl(url: string, outputFile: string) {
 export async function downloadPexelsVideo(query: string, outputDir: string, index = 0) {
   const url = await findPexelsVideoUrl(query)
   if (!url) return ''
-  const file = path.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-${safeFileName(query, 'mp4')}`)
+  const file = path.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-vid-${safeFileName(query, 'mp4')}`)
+  return await downloadUrl(url, file)
+}
+
+export async function downloadPexelsPhoto(query: string, outputDir: string, index = 0) {
+  const url = await findPexelsPhotoUrl(query)
+  if (!url) return ''
+  const ext = (url.split('?')[0].toLowerCase().endsWith('.png')) ? 'png' : 'jpg'
+  const file = path.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-img-${safeFileName(query, ext)}`)
   return await downloadUrl(url, file)
 }
