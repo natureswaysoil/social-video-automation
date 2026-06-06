@@ -82,6 +82,7 @@ async function checkPexels() {
 }
 
 async function main() {
+  const dryRunLogOnly = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true'
   const provider = String(process.env.VIDEO_PROVIDER || 'heygen').toLowerCase()
   const platforms = String(process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map(x => x.trim()).filter(Boolean)
 
@@ -94,12 +95,16 @@ async function main() {
   const results: any[] = []
   results.push(...checkFiles())
 
-  for (const secret of requiredSecrets) {
-    const ok = await loadSecretIfPresent(secret)
-    results.push({ check: `secret:${secret}`, ok })
-  }
+  if (dryRunLogOnly) {
+    results.push({ check: 'dry-run', ok: true, detail: 'Skipping secret and API validation checks (DRY_RUN_LOG_ONLY=true)' })
+  } else {
+    for (const secret of requiredSecrets) {
+      const ok = await loadSecretIfPresent(secret)
+      results.push({ check: `secret:${secret}`, ok })
+    }
 
-  results.push(await checkPexels())
+    results.push(await checkPexels())
+  }
 
   const failed = results.filter(r => !r.ok)
   for (const result of results) {
