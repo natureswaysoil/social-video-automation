@@ -116,6 +116,12 @@ function secretCandidates(name: string): string[] {
 async function loadSecrets() {
   const useSecretManager = String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() !== 'false'
   if (!useSecretManager) return
+  const dryRun = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true'
+  const hasAdc = !!process.env.GOOGLE_APPLICATION_CREDENTIALS || !!process.env.GOOGLE_GHA_CREDS_PATH
+  if (dryRun && !hasAdc) {
+    log('Secret Manager lookup skipped for local dry run without ADC credentials')
+    return
+  }
   const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'natureswaysoil-video'
   const client = new SecretManagerServiceClient()
   for (const secretName of SECRET_NAMES) {

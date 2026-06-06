@@ -90,11 +90,9 @@ async function checkPexels() {
 }
 async function main() {
     const dryRunLogOnly = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true';
-    const provider = String(process.env.VIDEO_PROVIDER || 'heygen').toLowerCase();
+    const provider = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase();
     const platforms = String(process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
     const requiredSecrets = ['OPENAI_API_KEY', 'PEXELS_API_KEY'];
-    if (provider === 'heygen')
-        requiredSecrets.push('HEYGEN_API_KEY');
     if (provider === 'did')
         requiredSecrets.push('DID_API_KEY');
     if (platforms.includes('youtube'))

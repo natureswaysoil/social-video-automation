@@ -9,6 +9,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const axios_1 = __importDefault(require("axios"));
 const openai_1 = __importDefault(require("openai"));
+const child_process_1 = require("child_process");
 const googleapis_1 = require("googleapis");
 const storage_1 = require("@google-cloud/storage");
 const secret_manager_1 = require("@google-cloud/secret-manager");
@@ -16,6 +17,11 @@ const ffmpeg_compositor_1 = require("./lib/ffmpeg-compositor");
 const pexels_media_1 = require("./lib/pexels-media");
 const product_assets_1 = require("./lib/product-assets");
 const video_utils_1 = require("./lib/video-utils");
+const video_provider_1 = require("./lib/video-provider");
+const caption_formatter_1 = require("./lib/caption-formatter");
+const social_platforms_1 = require("./lib/social-platforms");
+const facebook_groups_1 = require("./lib/facebook-groups");
+const marketing_engine_1 = require("./lib/marketing-engine");
 const ROOT = process.cwd();
 const CONFIG_PATH = path_1.default.resolve(ROOT, 'config/top-products.json');
 const STATE_PATH = path_1.default.resolve(ROOT, process.env.ROTATION_STATE_FILE || 'data/rotation-state.json');
@@ -25,6 +31,7 @@ const TEMP_DIR = path_1.default.resolve(ROOT, 'temp-scheduled');
 const FOOTAGE_DIR = path_1.default.resolve(ROOT, process.env.FOOTAGE_DIR || 'footage');
 const DEFAULT_PUBLIC_VIDEO_BUCKET = 'natureswaysoil-social-videos';
 const DEFAULT_STATE = { cursor: -1, variationByProduct: {} };
+const VIDEO_ANALYTICS_FILE = path_1.default.resolve(ROOT, process.env.VIDEO_ANALYTICS_FILE || 'data/video-analytics.json');
 const SECRET_NAMES = [
     'OPENAI_API_KEY',
     'OPENAI_MODEL',
@@ -43,6 +50,11 @@ const SECRET_NAMES = [
     'FB_PAGE_ID',
     'FACEBOOK_PAGE_ACCESS_TOKEN',
     'FACEBOOK_PAGE_ID',
+    'FACEBOOK_GROUPS_ACCESS_TOKEN',
+    'TIKTOK_ACCESS_TOKEN',
+    'TIKTOK_OPEN_ID',
+    'DID_API_KEY',
+    'DiD',
     'GCS_PUBLIC_BUCKET',
     'VIDEO_PUBLIC_BUCKET',
     'VIDEO_PUBLIC_URL_BASE'
@@ -113,6 +125,47 @@ function loadProducts() {
     const raw = readJson(CONFIG_PATH, { topProducts: [] });
     return Array.isArray(raw.topProducts) ? raw.topProducts.slice(0, Number(process.env.SEED_PRODUCT_LIMIT || 20)) : [];
 }
+function websiteCtaUrl(product) {
+    if (String(product.websiteUrl || '').trim())
+        return product.websiteUrl;
+    return 'https://www.natureswaysoil.com';
+}
+async function restoreRotationStateFromGcs() {
+    if (String(process.env.ROTATION_STATE_PERSIST_TO_GCS || 'true').toLowerCase() === 'false')
+        return;
+    try {
+        const bucketName = process.env.ROTATION_STATE_GCS_BUCKET || publicBucketName();
+        const objectName = process.env.ROTATION_STATE_GCS_OBJECT || 'state/rotation-state.json';
+        const storage = new storage_1.Storage();
+        const bucket = storage.bucket(bucketName);
+        const file = bucket.file(objectName);
+        const [exists] = await file.exists();
+        if (!exists)
+            return;
+        fs_1.default.mkdirSync(path_1.default.dirname(STATE_PATH), { recursive: true });
+        await file.download({ destination: STATE_PATH });
+        log('Restored rotation state from GCS', { bucketName, objectName, statePath: STATE_PATH });
+    }
+    catch (error) {
+        log('Rotation state restore skipped', error?.message || error);
+    }
+}
+async function persistRotationStateToGcs() {
+    if (!fs_1.default.existsSync(STATE_PATH))
+        return;
+    if (String(process.env.ROTATION_STATE_PERSIST_TO_GCS || 'true').toLowerCase() === 'false')
+        return;
+    try {
+        const bucketName = process.env.ROTATION_STATE_GCS_BUCKET || publicBucketName();
+        const objectName = process.env.ROTATION_STATE_GCS_OBJECT || 'state/rotation-state.json';
+        const storage = new storage_1.Storage();
+        await storage.bucket(bucketName).upload(STATE_PATH, { destination: objectName, resumable: false, metadata: { contentType: 'application/json' } });
+        log('Persisted rotation state to GCS', { bucketName, objectName });
+    }
+    catch (error) {
+        log('Rotation state persistence skipped', error?.message || error);
+    }
+}
 function pickProduct(products) {
     const state = readJson(STATE_PATH, { ...DEFAULT_STATE });
     const preferredId = process.env.NEXT_PRODUCT_PREFERRED_ID?.trim();
@@ -151,7 +204,7 @@ function curatedScenePlan(product, profile) {
         caption: scene.caption || scene.name || product.name,
         useProductImage: Boolean(scene.useProductImage) || index === 1 || index === profile.scenes.length - 1
     }));
-    const fallbackVoice = `${profile.hooks?.[0] || product.name}. ${product.description} ${profile.cta || 'Shop Nature\'s Way Soil direct or on Amazon.'}`;
+    const fallbackVoice = `${profile.hooks?.[0] || product.name}. ${product.description} ${profile.cta || 'See full product details at natureswaysoil.com.'}`;
     const voiceover = scenes.map((scene) => scene.voiceover).filter(Boolean).join(' ') || fallbackVoice;
     return { fullVoiceover: voiceover, scenes };
 }
@@ -162,7 +215,7 @@ function fallbackScenes(product, profile) {
         { name: 'Product', seconds: 5, voiceover: `${product.name} is designed to support healthier soil and stronger-looking growth.`, brollQuery: base[1] || product.name, useProductImage: true },
         { name: 'Application', seconds: 6, voiceover: 'Use it as part of your regular lawn, garden, pasture, or soil care routine according to label directions.', brollQuery: base[2] || 'spraying lawn' },
         { name: 'Field Result', seconds: 6, voiceover: 'The goal is better soil support, root-zone activity, and nutrient availability.', brollQuery: base[3] || 'healthy soil close up' },
-        { name: 'CTA', seconds: 6, voiceover: profile.cta || `Shop Nature's Way Soil direct or on Amazon.`, brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
+        { name: 'CTA', seconds: 6, voiceover: profile.cta || 'See full product details at natureswaysoil.com.', brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
     ];
 }
 function parseJson(text) {
@@ -195,7 +248,7 @@ async function generateScenePlan(product, profile, variationIndex, variationCoun
 Product: ${product.name}
 Description: ${product.description}
 Category: ${product.category}
-Website: ${product.amazonUrl || product.websiteUrl}
+Website: ${websiteCtaUrl(product)}
 Variation: ${variationIndex + 1} of ${variationCount}
 Audience: ${profile.audience || 'homeowners, gardeners, lawn care, land owners'}
 Angle: ${profile.angle || 'soil-first product explanation'}
@@ -223,10 +276,6 @@ Rules:
         return { fullVoiceover: String(parsed.fullVoiceover || scenes.map((s) => s.voiceover || '').join(' ')), scenes };
     }
     return { fullVoiceover: fallback.map(s => s.voiceover || '').join(' '), scenes: fallback };
-}
-function caption(product, script) {
-    const tags = ['#NaturesWaySoil', '#SoilHealth', '#LawnCare', '#Gardening'].join(' ');
-    return `${product.name}\n\n${product.description}\n\nShop: ${product.amazonUrl || product.websiteUrl}\n\n${tags}`;
 }
 function pickEnv(keys) {
     for (const key of keys) {
@@ -270,7 +319,13 @@ async function uploadVideoForSocial(videoFileOrUrl) {
     log('Uploaded video for social platforms', { bucketName, objectName, publicUrl });
     return publicUrl;
 }
-async function postToYouTube(videoFileOrUrl, title, description) {
+function createThumbnail(videoFile, product) {
+    (0, video_utils_1.ensureDir)(OUTPUT_DIR);
+    const output = path_1.default.resolve(OUTPUT_DIR, `${(0, video_utils_1.safeFileName)(`${product.name}-thumbnail`, 'jpg')}`);
+    (0, child_process_1.execSync)(`ffmpeg -y -loglevel error -i "${videoFile}" -ss 00:00:02 -vframes 1 "${output}"`, { stdio: 'inherit' });
+    return output;
+}
+async function postToYouTube(videoFileOrUrl, title, description, thumbnailFile) {
     const clientId = pickEnv(['YT_CLIENT_ID', 'YOUTUBE_CLIENT_ID']);
     const clientSecret = pickEnv(['YT_CLIENT_SECRET', 'YOUTUBE_CLIENT_SECRET']);
     const refreshToken = pickEnv(['YT_REFRESH_TOKEN', 'YOUTUBE_REFRESH_TOKEN']);
@@ -286,6 +341,14 @@ async function postToYouTube(videoFileOrUrl, title, description) {
     const id = upload.data.id || '';
     if (!id)
         throw new Error('YouTube upload did not return video id');
+    if (thumbnailFile && fs_1.default.existsSync(thumbnailFile)) {
+        try {
+            await youtube.thumbnails.set({ videoId: id, media: { body: fs_1.default.createReadStream(thumbnailFile) } });
+        }
+        catch (error) {
+            log('YouTube thumbnail upload failed', error?.message || error);
+        }
+    }
     return id;
 }
 async function postToInstagram(publicVideoUrl, captionText) {
@@ -398,48 +461,68 @@ function hookText(product, scenePlan) {
     const firstScene = scenePlan.scenes?.[0];
     return String(firstScene?.caption || firstScene?.name || product.name).slice(0, 80).toUpperCase();
 }
-async function renderVideo(product, scenePlan) {
+async function renderVideo(product, profile, scenePlan) {
     const { sceneFiles, productImage } = await collectSceneFiles(product, scenePlan);
     const sceneDurations = (scenePlan.scenes || []).map((scene) => Number(scene.seconds || 6));
+    const voiceoverFile = await (0, video_provider_1.createNarration)(product, scenePlan, profile, TEMP_DIR);
     const videoFile = await (0, ffmpeg_compositor_1.composeVerticalAd)({
         outputName: `${(0, video_utils_1.safeFileName)(product.name)}-scheduled.mp4`,
         sceneFiles,
         sceneDurations,
         productImage,
+        voiceoverFile,
         captionText: hookText(product, scenePlan),
         overlayText: (0, product_assets_1.productOverlayText)(product)
     });
-    log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage });
+    log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage, hasNarration: !!voiceoverFile });
     return videoFile;
 }
 async function main() {
     process.env.VIDEO_STYLE = String(process.env.VIDEO_STYLE || 'broll_ken_burns').toLowerCase();
+    process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase();
     await loadSecrets();
+    await restoreRotationStateFromGcs();
     const products = loadProducts();
     if (!products.length)
         throw new Error('No products configured');
     const { product, variationIndex, variationCount } = pickProduct(products);
+    await persistRotationStateToGcs();
     const profile = productCreativeProfile(product);
     log('Scheduled product selected', { videoStyle: process.env.VIDEO_STYLE, product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` });
     log('Creative mapping selected', { hasScenePlan: !!profile.scenes?.length, hasProductImage: !!product.productImageUrl, brollQueries: product.brollQueries?.length || 0 });
     const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount);
     log('Generated scene plan', { fullVoiceoverLength: scenePlan.fullVoiceover.length, scenes: scenePlan.scenes.map((scene, index) => ({ idx: index + 1, name: scene.name, seconds: scene.seconds, useProductImage: !!scene.useProductImage, brollQuery: scene.brollQuery })) });
-    const captionText = caption(product, scenePlan.fullVoiceover);
     const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean);
+    const captions = {
+        youtube: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'youtube'),
+        instagram: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'instagram'),
+        facebook: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'facebook'),
+        tiktok: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'tiktok'),
+        facebookGroups: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'facebook_groups')
+    };
     if (String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true') {
-        log('Dry run enabled; skipping render and social posting', { videoStyle: process.env.VIDEO_STYLE, platforms, caption: captionText, voiceover: scenePlan.fullVoiceover });
+        log('Dry run enabled; skipping render and social posting', {
+            videoStyle: process.env.VIDEO_STYLE,
+            videoProvider: process.env.VIDEO_PROVIDER,
+            platforms,
+            captions,
+            voiceover: scenePlan.fullVoiceover
+        });
         return;
     }
-    const videoFile = await renderVideo(product, scenePlan);
+    const videoFile = await renderVideo(product, profile, scenePlan);
+    const thumbnailFile = createThumbnail(videoFile, product);
     let publicVideoUrl = '';
-    if (platforms.includes('instagram') || platforms.includes('facebook')) {
+    if (platforms.includes('instagram') || platforms.includes('facebook') || platforms.includes('tiktok') || platforms.includes('facebook_groups')) {
         publicVideoUrl = await uploadVideoForSocial(videoFile);
     }
     let posted = 0;
+    const videoIds = {};
     if (platforms.includes('youtube')) {
         try {
-            const id = await postToYouTube(videoFile, product.name, captionText);
+            const id = await postToYouTube(videoFile, product.name, captions.youtube, thumbnailFile);
             posted++;
+            videoIds.youtubeId = id;
             log('Posted to YouTube', { id });
         }
         catch (error) {
@@ -448,8 +531,9 @@ async function main() {
     }
     if (platforms.includes('instagram')) {
         try {
-            const id = await postToInstagram(publicVideoUrl, captionText);
+            const id = await postToInstagram(publicVideoUrl, captions.instagram);
             posted++;
+            videoIds.instagramId = id;
             log('Posted to Instagram', { id });
         }
         catch (error) {
@@ -458,16 +542,53 @@ async function main() {
     }
     if (platforms.includes('facebook')) {
         try {
-            const id = await postToFacebook(publicVideoUrl, captionText);
+            const id = await postToFacebook(publicVideoUrl, captions.facebook);
             posted++;
+            videoIds.facebookId = id;
             log('Posted to Facebook', { id });
         }
         catch (error) {
             log('Facebook post failed', error?.message || error);
         }
     }
+    if (platforms.includes('tiktok')) {
+        try {
+            const result = await (0, social_platforms_1.postToTikTok)(publicVideoUrl, captions.tiktok);
+            if (!result?.skipped)
+                posted++;
+            log('Posted to TikTok', result);
+        }
+        catch (error) {
+            log('TikTok post failed', error?.message || error);
+        }
+    }
+    if (platforms.includes('facebook_groups')) {
+        try {
+            const results = await (0, facebook_groups_1.postToFacebookGroups)(product, publicVideoUrl, captions.facebookGroups);
+            const successes = results.filter((item) => item.ok).length;
+            if (successes > 0)
+                posted += successes;
+            log('Facebook group posting completed', { attempts: results.length, successes });
+        }
+        catch (error) {
+            log('Facebook groups post failed', error?.message || error);
+        }
+    }
+    const metrics = await (0, social_platforms_1.fetchBasicMetrics)(videoIds);
+    (0, marketing_engine_1.recordPerformance)({
+        productId: product.id,
+        productName: product.name,
+        hook: hookText(product, scenePlan),
+        variant: `scheduled_v${variationIndex + 1}`,
+        views: Number(metrics.youtube?.views || metrics.instagram?.views || metrics.facebook?.views || 0),
+        likes: Number((metrics.youtube?.likes || 0) + (metrics.instagram?.likes || 0) + (metrics.facebook?.likes || 0)),
+        comments: Number((metrics.youtube?.comments || 0) + (metrics.instagram?.comments || 0) + (metrics.facebook?.comments || 0)),
+        clicks: 0,
+        videoIds,
+        analyticsFile: VIDEO_ANALYTICS_FILE
+    });
     if (posted === 0)
         throw new Error('No platform posts succeeded');
-    log('Scheduled post completed', { posted, videoFile, publicVideoUrl });
+    log('Scheduled post completed', { posted, videoFile, publicVideoUrl, thumbnailFile, videoIds, metrics });
 }
 main().catch((error) => { console.error('Scheduled post failed:', error?.message || error); process.exit(1); });

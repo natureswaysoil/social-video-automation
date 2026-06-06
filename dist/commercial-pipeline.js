@@ -15,6 +15,7 @@ const pexels_media_1 = require("./lib/pexels-media");
 const ffmpeg_compositor_1 = require("./lib/ffmpeg-compositor");
 const product_assets_1 = require("./lib/product-assets");
 const retention_engine_1 = require("./lib/retention-engine");
+const ffmpeg_builder_1 = require("./lib/ffmpeg-builder");
 const marketing_engine_1 = require("./lib/marketing-engine");
 const video_utils_1 = require("./lib/video-utils");
 const ROOT = process.cwd();
@@ -109,7 +110,7 @@ function localFootageCandidates(product) {
 }
 async function generateScenePlan(product, profile, hook) {
     if (!process.env.OPENAI_API_KEY) {
-        return { fullVoiceover: `${hook}. ${product.description}. Shop Nature's Way Soil today.`, scenes: fallbackQueries(product).slice(0, 5).map((query, i) => ({ name: `Scene ${i + 1}`, seconds: i === 0 ? 3 : 5, voiceover: product.description, brollQuery: query })) };
+        return { fullVoiceover: `${hook}. ${product.description}. See full product details at natureswaysoil.com.`, scenes: fallbackQueries(product).slice(0, 5).map((query, i) => ({ name: `Scene ${i + 1}`, seconds: i === 0 ? 3 : 5, voiceover: product.description, brollQuery: query })) };
     }
     const client = new openai_1.default({ apiKey: process.env.OPENAI_API_KEY });
     const prompt = `Build a commercial short-form ad scene plan for Nature's Way Soil.
@@ -131,7 +132,36 @@ Return JSON only: {"fullVoiceover":"...","scenes":[{"name":"...","seconds":5,"vo
 }
 async function makeThumbnail(videoFile, product, hook) {
     const thumbnail = path_1.default.resolve(OUTPUT_DIR, `${(0, video_utils_1.safeFileName)(product.name)}-thumbnail.jpg`);
-    (0, child_process_1.execSync)(`ffmpeg -y -i "${videoFile}" -ss 00:00:02 -vframes 1 "${thumbnail}"`, { stdio: 'inherit' });
+    if (process.env.OPENAI_API_KEY && String(process.env.USE_DALLE_THUMBNAIL || 'true').toLowerCase() === 'true') {
+        try {
+            const client = new openai_1.default({ apiKey: process.env.OPENAI_API_KEY });
+            const promptParts = (0, ffmpeg_builder_1.buildThumbnailPrompt)(product);
+            const prompt = [
+                `Create a product-focused vertical social thumbnail for Nature's Way Soil.`,
+                `Headline: ${promptParts.headline}`,
+                `Subheadline: ${promptParts.subheadline}`,
+                `Visual style: ${promptParts.visual}`,
+                `Hook context: ${hook}`,
+                `Brand CTA should direct viewers to natureswaysoil.com.`,
+                'No text clutter, no claims of guaranteed results.'
+            ].join('\n');
+            const image = await client.images.generate({
+                model: process.env.THUMBNAIL_IMAGE_MODEL || 'dall-e-3',
+                prompt,
+                size: '1024x1024',
+                quality: 'standard'
+            });
+            const b64 = image.data?.[0]?.b64_json;
+            if (b64) {
+                fs_1.default.writeFileSync(thumbnail, Buffer.from(b64, 'base64'));
+                return thumbnail;
+            }
+        }
+        catch (error) {
+            console.log('DALL-E thumbnail generation failed; using frame extract fallback', { error: error?.message || error });
+        }
+    }
+    (0, child_process_1.execSync)(`ffmpeg -y -loglevel error -i "${videoFile}" -ss 00:00:02 -vframes 1 "${thumbnail}"`, { stdio: 'inherit' });
     return thumbnail;
 }
 function exportPlatformVariants(masterFile, product) {
