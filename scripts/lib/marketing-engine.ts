@@ -50,7 +50,21 @@ export function pickABVariant(product: any) {
   for (const video of analytics.videos || []) {
     if (video.productId === product.id && video.variant && counts[video.variant] !== undefined) counts[video.variant]++
   }
-  return candidates.sort((a, b) => counts[a] - counts[b])[0]
+  const variantScores: Record<string, number> = Object.fromEntries(candidates.map((c) => [c, 0]))
+  for (const video of analytics.videos || []) {
+    if (video.productId !== product.id || !video.variant || variantScores[video.variant] === undefined) continue
+    const likes = Number(video.likes || 0)
+    const comments = Number(video.comments || 0)
+    const clicks = Number(video.clicks || 0)
+    const views = Number(video.views || 0)
+    variantScores[video.variant] += (likes * 2) + (comments * 3) + (clicks * 5) + (views * 0.01)
+  }
+
+  return candidates.sort((a, b) => {
+    const scoreDiff = variantScores[b] - variantScores[a]
+    if (scoreDiff !== 0) return scoreDiff
+    return counts[a] - counts[b]
+  })[0]
 }
 
 export async function generateTrendAwareHooks(product: any, profile: any) {

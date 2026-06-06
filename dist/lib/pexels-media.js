@@ -1,0 +1,143 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.findPexelsVideoUrl = findPexelsVideoUrl;
+exports.findPexelsPhotoUrl = findPexelsPhotoUrl;
+exports.downloadUrl = downloadUrl;
+exports.downloadPexelsVideo = downloadPexelsVideo;
+exports.downloadPexelsPhoto = downloadPexelsPhoto;
+// @ts-nocheck
+const axios_1 = __importDefault(require("axios"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const video_utils_1 = require("./video-utils");
+const PEXELS_VIDEO_API = 'https://api.pexels.com/videos/search';
+const PEXELS_PHOTO_API = 'https://api.pexels.com/v1/search';
+function trimQuery(query, words = 4) {
+    return String(query || '').split(/\s+/).filter(Boolean).slice(0, words).join(' ');
+}
+/**
+ * Build the search attempts for a query. We keep the attempts CLOSE to the
+ * product (full query -> trimmed query) and only fall back to a generic term
+ * as a last resort. Previously the chain degraded straight to "green lawn",
+ * which is the main reason b-roll looked generic and unrelated to the product.
+ */
+function videoAttempts(query) {
+    const q = String(query || '').trim();
+    const short = trimQuery(q, 3);
+    return [
+        { query: q, orientation: 'portrait' },
+        { query: q, orientation: 'landscape' },
+        short !== q ? { query: short, orientation: 'portrait' } : null,
+        short !== q ? { query: short, orientation: 'landscape' } : null
+    ].filter(Boolean);
+}
+// ---------------------------------------------------------------------------
+// VIDEO b-roll
+// ---------------------------------------------------------------------------
+async function findPexelsVideoUrl(query) {
+    const key = process.env.PEXELS_API_KEY;
+    if (!key) {
+        console.log('Pexels skipped: missing PEXELS_API_KEY');
+        return '';
+    }
+    for (const attempt of videoAttempts(query)) {
+        try {
+            const response = await axios_1.default.get(PEXELS_VIDEO_API, {
+                headers: { Authorization: key },
+                params: { query: attempt.query, orientation: attempt.orientation, per_page: 15 },
+                timeout: 30000
+            });
+            const videos = Array.isArray(response.data?.videos) ? response.data.videos : [];
+            console.log('Pexels video search', { query: attempt.query, orientation: attempt.orientation, count: videos.length });
+            // Prefer real portrait clips at a sane resolution (>=720 wide, <=2160),
+            // so we don't grab a 4K landscape file and hard-crop it to a sliver.
+            const ranked = videos
+                .map((video) => {
+                const files = video.video_files || [];
+                const portrait = files
+                    .filter((f) => Number(f.height || 0) >= Number(f.width || 0))
+                    .sort((a, b) => Math.abs(1080 - Number(a.width || 0)) - Math.abs(1080 - Number(b.width || 0)))[0];
+                const any = files.sort((a, b) => Math.abs(1080 - Number(a.width || 0)) - Math.abs(1080 - Number(b.width || 0)))[0];
+                const best = portrait || any;
+                return { id: video.id, url: best?.link || '', width: best?.width || 0, height: best?.height || 0, isPortrait: !!portrait };
+            })
+                .filter((item) => item.url)
+                // portrait first, then closeness to 1080 wide
+                .sort((a, b) => (Number(b.isPortrait) - Number(a.isPortrait)) || (Math.abs(1080 - a.width) - Math.abs(1080 - b.width)));
+            if (ranked[0]) {
+                console.log('Selected Pexels video', { query: attempt.query, id: ranked[0].id, res: `${ranked[0].width}x${ranked[0].height}`, portrait: ranked[0].isPortrait });
+                return ranked[0].url;
+            }
+        }
+        catch (error) {
+            console.log('Pexels video search failed', { query: attempt.query, status: error?.response?.status, message: error?.message });
+        }
+    }
+    return '';
+}
+// ---------------------------------------------------------------------------
+// PHOTO b-roll (used for Ken Burns scenes)
+// ---------------------------------------------------------------------------
+async function findPexelsPhotoUrl(query) {
+    const key = process.env.PEXELS_API_KEY;
+    if (!key) {
+        console.log('Pexels skipped: missing PEXELS_API_KEY');
+        return '';
+    }
+    const attempts = [
+        { query: String(query || '').trim(), orientation: 'portrait' },
+        { query: trimQuery(query, 3), orientation: 'portrait' },
+        { query: String(query || '').trim(), orientation: 'landscape' }
+    ];
+    for (const attempt of attempts) {
+        try {
+            const response = await axios_1.default.get(PEXELS_PHOTO_API, {
+                headers: { Authorization: key },
+                params: { query: attempt.query, orientation: attempt.orientation, per_page: 15 },
+                timeout: 30000
+            });
+            const photos = Array.isArray(response.data?.photos) ? response.data.photos : [];
+            console.log('Pexels photo search', { query: attempt.query, orientation: attempt.orientation, count: photos.length });
+            const first = photos[0];
+            // large2x (~1880px) is plenty for a 1080x1920 Ken Burns frame; original is huge.
+            const url = first?.src?.large2x || first?.src?.original || first?.src?.large || '';
+            if (url) {
+                console.log('Selected Pexels photo', { query: attempt.query, id: first?.id });
+                return url;
+            }
+        }
+        catch (error) {
+            console.log('Pexels photo search failed', { query: attempt.query, status: error?.response?.status, message: error?.message });
+        }
+    }
+    return '';
+}
+async function downloadUrl(url, outputFile) {
+    (0, video_utils_1.ensureDir)(path_1.default.dirname(outputFile));
+    const response = await axios_1.default.get(url, { responseType: 'stream', timeout: 120000 });
+    await new Promise((resolve, reject) => {
+        const writer = fs_1.default.createWriteStream(outputFile);
+        response.data.pipe(writer);
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+    });
+    return outputFile;
+}
+async function downloadPexelsVideo(query, outputDir, index = 0) {
+    const url = await findPexelsVideoUrl(query);
+    if (!url)
+        return '';
+    const file = path_1.default.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-vid-${(0, video_utils_1.safeFileName)(query, 'mp4')}`);
+    return await downloadUrl(url, file);
+}
+async function downloadPexelsPhoto(query, outputDir, index = 0) {
+    const url = await findPexelsPhotoUrl(query);
+    if (!url)
+        return '';
+    const ext = (url.split('?')[0].toLowerCase().endsWith('.png')) ? 'png' : 'jpg';
+    const file = path_1.default.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-img-${(0, video_utils_1.safeFileName)(query, ext)}`);
+    return await downloadUrl(url, file);
+}

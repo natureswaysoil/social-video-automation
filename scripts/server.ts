@@ -49,8 +49,7 @@ app.get('/readyz', (_req, res) => {
   const files = requiredFiles.map((file) => ({ file, ...fileStatus(file) }))
   const missingFiles = files.filter((f) => !f.exists)
   const requiredEnv = ['OPENAI_API_KEY', 'PEXELS_API_KEY']
-  const provider = String(process.env.VIDEO_PROVIDER || 'heygen').toLowerCase()
-  if (provider === 'heygen') requiredEnv.push('HEYGEN_API_KEY')
+  const provider = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase()
   if (provider === 'did') requiredEnv.push('DID_API_KEY')
   const env = requiredEnv.map((name) => ({ name, present: hasEnv(name) }))
   const missingEnv = env.filter((e) => !e.present)
@@ -64,7 +63,7 @@ app.get('/status', (_req, res) => {
   const state = safeJson(STATE_FILE, { cursor: -1, variationByProduct: {} })
   res.json({
     ok: true,
-    provider: process.env.VIDEO_PROVIDER || 'heygen',
+    provider: process.env.VIDEO_PROVIDER || 'did',
     dryRun: String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true',
     platforms: process.env.ENABLE_PLATFORMS || 'youtube,instagram',
     productCount: Array.isArray(products.topProducts) ? products.topProducts.length : 0,
