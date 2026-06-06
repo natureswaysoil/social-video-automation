@@ -9,8 +9,8 @@ This repo is separate from `natureswaysoil/video` so daily posting does not conf
 - Rotates through the top 5 Nature's Way Soil products
 - Generates a fresh 25-35 second script with OpenAI
 - Pulls portrait B-roll from Pexels when available
-- Creates a vertical HeyGen video
-- Polls until the HeyGen MP4 is ready
+- Creates a vertical b-roll video with optional D-ID narration
+- Polls until D-ID narration media is ready when narration is enabled
 - Posts to YouTube and Instagram when credentials are configured
 - Runs 5 scheduled slots per day through GitHub Actions
 

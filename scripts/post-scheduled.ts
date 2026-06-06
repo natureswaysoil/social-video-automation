@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
 import OpenAI from 'openai'
+import { execSync } from 'child_process'
 import { google } from 'googleapis'
 import { Storage } from '@google-cloud/storage'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
@@ -11,6 +12,11 @@ import { composeVerticalAd } from './lib/ffmpeg-compositor'
 import { downloadPexelsVideo } from './lib/pexels-media'
 import { downloadProductImage, productOverlayText } from './lib/product-assets'
 import { ensureDir, safeFileName } from './lib/video-utils'
+import { createNarration } from './lib/video-provider'
+import { formatCaption } from './lib/caption-formatter'
+import { postToTikTok, fetchBasicMetrics } from './lib/social-platforms'
+import { postToFacebookGroups } from './lib/facebook-groups'
+import { recordPerformance } from './lib/marketing-engine'
 
 type Product = {
   id: string
@@ -58,6 +64,7 @@ const TEMP_DIR = path.resolve(ROOT, 'temp-scheduled')
 const FOOTAGE_DIR = path.resolve(ROOT, process.env.FOOTAGE_DIR || 'footage')
 const DEFAULT_PUBLIC_VIDEO_BUCKET = 'natureswaysoil-social-videos'
 const DEFAULT_STATE: State = { cursor: -1, variationByProduct: {} }
+const VIDEO_ANALYTICS_FILE = path.resolve(ROOT, process.env.VIDEO_ANALYTICS_FILE || 'data/video-analytics.json')
 
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
@@ -77,6 +84,11 @@ const SECRET_NAMES = [
   'FB_PAGE_ID',
   'FACEBOOK_PAGE_ACCESS_TOKEN',
   'FACEBOOK_PAGE_ID',
+  'FACEBOOK_GROUPS_ACCESS_TOKEN',
+  'TIKTOK_ACCESS_TOKEN',
+  'TIKTOK_OPEN_ID',
+  'DID_API_KEY',
+  'DiD',
   'GCS_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_URL_BASE'
@@ -146,6 +158,43 @@ function loadProducts(): Product[] {
   return Array.isArray(raw.topProducts) ? raw.topProducts.slice(0, Number(process.env.SEED_PRODUCT_LIMIT || 20)) : []
 }
 
+function websiteCtaUrl(product: Product) {
+  if (String(product.websiteUrl || '').trim()) return product.websiteUrl
+  return 'https://www.natureswaysoil.com'
+}
+
+async function restoreRotationStateFromGcs() {
+  if (String(process.env.ROTATION_STATE_PERSIST_TO_GCS || 'true').toLowerCase() === 'false') return
+  try {
+    const bucketName = process.env.ROTATION_STATE_GCS_BUCKET || publicBucketName()
+    const objectName = process.env.ROTATION_STATE_GCS_OBJECT || 'state/rotation-state.json'
+    const storage = new Storage()
+    const bucket = storage.bucket(bucketName)
+    const file = bucket.file(objectName)
+    const [exists] = await file.exists()
+    if (!exists) return
+    fs.mkdirSync(path.dirname(STATE_PATH), { recursive: true })
+    await file.download({ destination: STATE_PATH })
+    log('Restored rotation state from GCS', { bucketName, objectName, statePath: STATE_PATH })
+  } catch (error: any) {
+    log('Rotation state restore skipped', error?.message || error)
+  }
+}
+
+async function persistRotationStateToGcs() {
+  if (!fs.existsSync(STATE_PATH)) return
+  if (String(process.env.ROTATION_STATE_PERSIST_TO_GCS || 'true').toLowerCase() === 'false') return
+  try {
+    const bucketName = process.env.ROTATION_STATE_GCS_BUCKET || publicBucketName()
+    const objectName = process.env.ROTATION_STATE_GCS_OBJECT || 'state/rotation-state.json'
+    const storage = new Storage()
+    await storage.bucket(bucketName).upload(STATE_PATH, { destination: objectName, resumable: false, metadata: { contentType: 'application/json' } })
+    log('Persisted rotation state to GCS', { bucketName, objectName })
+  } catch (error: any) {
+    log('Rotation state persistence skipped', error?.message || error)
+  }
+}
+
 function pickProduct(products: Product[]) {
   const state = readJson(STATE_PATH, { ...DEFAULT_STATE })
   const preferredId = process.env.NEXT_PRODUCT_PREFERRED_ID?.trim()
@@ -184,7 +233,7 @@ function curatedScenePlan(product: Product, profile: CreativeProfile): { fullVoi
     caption: scene.caption || scene.name || product.name,
     useProductImage: Boolean(scene.useProductImage) || index === 1 || index === profile.scenes!.length - 1
   }))
-  const fallbackVoice = `${profile.hooks?.[0] || product.name}. ${product.description} ${profile.cta || 'Shop Nature\'s Way Soil direct or on Amazon.'}`
+  const fallbackVoice = `${profile.hooks?.[0] || product.name}. ${product.description} ${profile.cta || 'See full product details at natureswaysoil.com.'}`
   const voiceover = scenes.map((scene) => scene.voiceover).filter(Boolean).join(' ') || fallbackVoice
   return { fullVoiceover: voiceover, scenes }
 }
@@ -196,7 +245,7 @@ function fallbackScenes(product: Product, profile: CreativeProfile): CreativeSce
     { name: 'Product', seconds: 5, voiceover: `${product.name} is designed to support healthier soil and stronger-looking growth.`, brollQuery: base[1] || product.name, useProductImage: true },
     { name: 'Application', seconds: 6, voiceover: 'Use it as part of your regular lawn, garden, pasture, or soil care routine according to label directions.', brollQuery: base[2] || 'spraying lawn' },
     { name: 'Field Result', seconds: 6, voiceover: 'The goal is better soil support, root-zone activity, and nutrient availability.', brollQuery: base[3] || 'healthy soil close up' },
-    { name: 'CTA', seconds: 6, voiceover: profile.cta || `Shop Nature's Way Soil direct or on Amazon.`, brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
+    { name: 'CTA', seconds: 6, voiceover: profile.cta || 'See full product details at natureswaysoil.com.', brollQuery: base[4] || 'healthy green lawn', useProductImage: true }
   ]
 }
 
@@ -219,7 +268,7 @@ async function generateScenePlan(product: Product, profile: CreativeProfile, var
 Product: ${product.name}
 Description: ${product.description}
 Category: ${product.category}
-Website: ${product.amazonUrl || product.websiteUrl}
+Website: ${websiteCtaUrl(product)}
 Variation: ${variationIndex + 1} of ${variationCount}
 Audience: ${profile.audience || 'homeowners, gardeners, lawn care, land owners'}
 Angle: ${profile.angle || 'soil-first product explanation'}
@@ -247,11 +296,6 @@ Rules:
     return { fullVoiceover: String(parsed.fullVoiceover || scenes.map((s: CreativeScene) => s.voiceover || '').join(' ')), scenes }
   }
   return { fullVoiceover: fallback.map(s => s.voiceover || '').join(' '), scenes: fallback }
-}
-
-function caption(product: Product, script: string): string {
-  const tags = ['#NaturesWaySoil', '#SoilHealth', '#LawnCare', '#Gardening'].join(' ')
-  return `${product.name}\n\n${product.description}\n\nShop: ${product.amazonUrl || product.websiteUrl}\n\n${tags}`
 }
 
 function pickEnv(keys: string[]): string {
@@ -298,7 +342,14 @@ async function uploadVideoForSocial(videoFileOrUrl: string): Promise<string> {
   return publicUrl
 }
 
-async function postToYouTube(videoFileOrUrl: string, title: string, description: string): Promise<string> {
+function createThumbnail(videoFile: string, product: Product): string {
+  ensureDir(OUTPUT_DIR)
+  const output = path.resolve(OUTPUT_DIR, `${safeFileName(`${product.name}-thumbnail`, 'jpg')}`)
+  execSync(`ffmpeg -y -loglevel error -i "${videoFile}" -ss 00:00:02 -vframes 1 "${output}"`, { stdio: 'inherit' })
+  return output
+}
+
+async function postToYouTube(videoFileOrUrl: string, title: string, description: string, thumbnailFile?: string): Promise<string> {
   const clientId = pickEnv(['YT_CLIENT_ID', 'YOUTUBE_CLIENT_ID'])
   const clientSecret = pickEnv(['YT_CLIENT_SECRET', 'YOUTUBE_CLIENT_SECRET'])
   const refreshToken = pickEnv(['YT_REFRESH_TOKEN', 'YOUTUBE_REFRESH_TOKEN'])
@@ -312,6 +363,13 @@ async function postToYouTube(videoFileOrUrl: string, title: string, description:
   const upload = await youtube.videos.insert({ part: ['snippet', 'status'], requestBody: { snippet: { title: title.slice(0, 95), description, categoryId: '22' }, status: { privacyStatus: (process.env.YT_PRIVACY_STATUS as any) || 'public' } }, media: { body } })
   const id = upload.data.id || ''
   if (!id) throw new Error('YouTube upload did not return video id')
+  if (thumbnailFile && fs.existsSync(thumbnailFile)) {
+    try {
+      await youtube.thumbnails.set({ videoId: id, media: { body: fs.createReadStream(thumbnailFile) } })
+    } catch (error: any) {
+      log('YouTube thumbnail upload failed', error?.message || error)
+    }
+  }
   return id
 }
 
@@ -412,56 +470,124 @@ function hookText(product: Product, scenePlan: any) {
   return String(firstScene?.caption || firstScene?.name || product.name).slice(0, 80).toUpperCase()
 }
 
-async function renderVideo(product: Product, scenePlan: any): Promise<string> {
+async function renderVideo(product: Product, profile: CreativeProfile, scenePlan: any): Promise<string> {
   const { sceneFiles, productImage } = await collectSceneFiles(product, scenePlan)
   const sceneDurations = (scenePlan.scenes || []).map((scene: CreativeScene) => Number(scene.seconds || 6))
+  const voiceoverFile = await createNarration(product, scenePlan, profile, TEMP_DIR)
   const videoFile = await composeVerticalAd({
     outputName: `${safeFileName(product.name)}-scheduled.mp4`,
     sceneFiles,
     sceneDurations,
     productImage,
+    voiceoverFile,
     captionText: hookText(product, scenePlan),
     overlayText: productOverlayText(product)
   })
-  log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage })
+  log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage, hasNarration: !!voiceoverFile })
   return videoFile
 }
 
 async function main() {
   process.env.VIDEO_STYLE = String(process.env.VIDEO_STYLE || 'broll_ken_burns').toLowerCase()
+  process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase()
   await loadSecrets()
+  await restoreRotationStateFromGcs()
   const products = loadProducts()
   if (!products.length) throw new Error('No products configured')
   const { product, variationIndex, variationCount } = pickProduct(products)
+  await persistRotationStateToGcs()
   const profile = productCreativeProfile(product)
   log('Scheduled product selected', { videoStyle: process.env.VIDEO_STYLE, product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` })
   log('Creative mapping selected', { hasScenePlan: !!profile.scenes?.length, hasProductImage: !!product.productImageUrl, brollQueries: product.brollQueries?.length || 0 })
   const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount)
   log('Generated scene plan', { fullVoiceoverLength: scenePlan.fullVoiceover.length, scenes: scenePlan.scenes.map((scene: CreativeScene, index: number) => ({ idx: index + 1, name: scene.name, seconds: scene.seconds, useProductImage: !!scene.useProductImage, brollQuery: scene.brollQuery })) })
-  const captionText = caption(product, scenePlan.fullVoiceover)
   const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean)
+  const captions = {
+    youtube: formatCaption(product, scenePlan, 'youtube'),
+    instagram: formatCaption(product, scenePlan, 'instagram'),
+    facebook: formatCaption(product, scenePlan, 'facebook'),
+    tiktok: formatCaption(product, scenePlan, 'tiktok'),
+    facebookGroups: formatCaption(product, scenePlan, 'facebook_groups')
+  }
   if (String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true') {
-    log('Dry run enabled; skipping render and social posting', { videoStyle: process.env.VIDEO_STYLE, platforms, caption: captionText, voiceover: scenePlan.fullVoiceover })
+    log('Dry run enabled; skipping render and social posting', {
+      videoStyle: process.env.VIDEO_STYLE,
+      videoProvider: process.env.VIDEO_PROVIDER,
+      platforms,
+      captions,
+      voiceover: scenePlan.fullVoiceover
+    })
     return
   }
-  const videoFile = await renderVideo(product, scenePlan)
+  const videoFile = await renderVideo(product, profile, scenePlan)
+  const thumbnailFile = createThumbnail(videoFile, product)
   let publicVideoUrl = ''
-  if (platforms.includes('instagram') || platforms.includes('facebook')) {
+  if (platforms.includes('instagram') || platforms.includes('facebook') || platforms.includes('tiktok') || platforms.includes('facebook_groups')) {
     publicVideoUrl = await uploadVideoForSocial(videoFile)
   }
 
   let posted = 0
+  const videoIds: Record<string, string> = {}
   if (platforms.includes('youtube')) {
-    try { const id = await postToYouTube(videoFile, product.name, captionText); posted++; log('Posted to YouTube', { id }) } catch (error: any) { log('YouTube post failed', error?.message || error) }
+    try {
+      const id = await postToYouTube(videoFile, product.name, captions.youtube, thumbnailFile)
+      posted++
+      videoIds.youtubeId = id
+      log('Posted to YouTube', { id })
+    } catch (error: any) { log('YouTube post failed', error?.message || error) }
   }
   if (platforms.includes('instagram')) {
-    try { const id = await postToInstagram(publicVideoUrl, captionText); posted++; log('Posted to Instagram', { id }) } catch (error: any) { log('Instagram post failed', error?.message || error) }
+    try {
+      const id = await postToInstagram(publicVideoUrl, captions.instagram)
+      posted++
+      videoIds.instagramId = id
+      log('Posted to Instagram', { id })
+    } catch (error: any) { log('Instagram post failed', error?.message || error) }
   }
   if (platforms.includes('facebook')) {
-    try { const id = await postToFacebook(publicVideoUrl, captionText); posted++; log('Posted to Facebook', { id }) } catch (error: any) { log('Facebook post failed', error?.message || error) }
+    try {
+      const id = await postToFacebook(publicVideoUrl, captions.facebook)
+      posted++
+      videoIds.facebookId = id
+      log('Posted to Facebook', { id })
+    } catch (error: any) { log('Facebook post failed', error?.message || error) }
   }
+  if (platforms.includes('tiktok')) {
+    try {
+      const result = await postToTikTok(publicVideoUrl, captions.tiktok)
+      if (!(result as any)?.skipped) posted++
+      log('Posted to TikTok', result)
+    } catch (error: any) {
+      log('TikTok post failed', error?.message || error)
+    }
+  }
+  if (platforms.includes('facebook_groups')) {
+    try {
+      const results = await postToFacebookGroups(product, publicVideoUrl, captions.facebookGroups)
+      const successes = results.filter((item: any) => item.ok).length
+      if (successes > 0) posted += successes
+      log('Facebook group posting completed', { attempts: results.length, successes })
+    } catch (error: any) {
+      log('Facebook groups post failed', error?.message || error)
+    }
+  }
+
+  const metrics = await fetchBasicMetrics(videoIds)
+  recordPerformance({
+    productId: product.id,
+    productName: product.name,
+    hook: hookText(product, scenePlan),
+    variant: `scheduled_v${variationIndex + 1}`,
+    views: Number(metrics.youtube?.views || metrics.instagram?.views || metrics.facebook?.views || 0),
+    likes: Number((metrics.youtube?.likes || 0) + (metrics.instagram?.likes || 0) + (metrics.facebook?.likes || 0)),
+    comments: Number((metrics.youtube?.comments || 0) + (metrics.instagram?.comments || 0) + (metrics.facebook?.comments || 0)),
+    clicks: 0,
+    videoIds,
+    analyticsFile: VIDEO_ANALYTICS_FILE
+  })
+
   if (posted === 0) throw new Error('No platform posts succeeded')
-  log('Scheduled post completed', { posted, videoFile, publicVideoUrl })
+  log('Scheduled post completed', { posted, videoFile, publicVideoUrl, thumbnailFile, videoIds, metrics })
 }
 
 main().catch((error) => { console.error('Scheduled post failed:', error?.message || error); process.exit(1) })

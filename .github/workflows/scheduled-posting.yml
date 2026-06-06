@@ -66,6 +66,11 @@ jobs:
       FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
       FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
       FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+      FACEBOOK_GROUPS_ACCESS_TOKEN: ${{ secrets.FACEBOOK_GROUPS_ACCESS_TOKEN }}
+      TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+      TIKTOK_OPEN_ID: ${{ secrets.TIKTOK_OPEN_ID }}
+      DID_API_KEY: ${{ secrets.DID_API_KEY }}
+      DiD: ${{ secrets.DiD }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
@@ -207,6 +212,10 @@ jobs:
       - name: Run scheduled video post
         if: env.RUN_POSTING == 'true'
         run: npm run post:scheduled
+
+      - name: Optional analytics backfill (after 24h)
+        if: env.RUN_POSTING == 'true' && env.RUN_ANALYTICS_BACKFILL == 'true'
+        run: npm run fetch:analytics
 
       - name: Save rotation state cache
         if: always() && env.RUN_POSTING == 'true'

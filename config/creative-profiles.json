@@ -55,6 +55,56 @@
         }
       ]
     },
+    "NWS_024": {
+      "audience": "gardeners, raised-bed growers, and homeowners fixing compacted or lifeless soil",
+      "angle": "problem-first living-soil revitalizer sequence based on the May 6 winning visual cadence",
+      "tone": "practical, fast-paced, visual-first, no overpromising",
+      "cta": "See full product details at natureswaysoil.com.",
+      "hooks": [
+        "If your soil looks tired, start with biology before adding more fertilizer.",
+        "Weak growth often starts below the surface, not above it.",
+        "Healthy plants need healthy living soil first."
+      ],
+      "scenes": [
+        {
+          "name": "scroll-stopping problem close-up",
+          "seconds": 4,
+          "voiceover": "If your plants look stuck, the real issue may be exhausted soil biology.",
+          "brollQuery": "thin patchy garden soil close up",
+          "caption": "SOIL LOOKS TIRED?"
+        },
+        {
+          "name": "product bottle hero shot",
+          "seconds": 5,
+          "voiceover": "Nature's Way Soil Living Soil Revitalizer combines worm castings and activated biochar for soil-first support.",
+          "brollQuery": "soil amendment product bag in garden",
+          "caption": "LIVING SOIL REVITALIZER",
+          "useProductImage": true
+        },
+        {
+          "name": "mixing or application",
+          "seconds": 6,
+          "voiceover": "Top-dress or mix into raised beds and containers as part of your normal routine.",
+          "brollQuery": "mixing compost into raised bed",
+          "caption": "EASY TO APPLY"
+        },
+        {
+          "name": "soil/root/grass benefit close-up",
+          "seconds": 6,
+          "voiceover": "The goal is better structure, root-zone support, and improved nutrient movement.",
+          "brollQuery": "healthy roots rich soil close up",
+          "caption": "ROOT-ZONE SUPPORT"
+        },
+        {
+          "name": "healthier result with CTA mood",
+          "seconds": 7,
+          "voiceover": "For full use directions and product details, visit natureswaysoil.com.",
+          "brollQuery": "healthy raised bed garden result",
+          "caption": "LEARN MORE AT NATURESWAYSOIL.COM",
+          "useProductImage": true
+        }
+      ]
+    },
     "NWS_014": {
       "audience": "dog owners with yellow lawn spots, pet areas, kennels, patios, and turf runs",
       "angle": "soil-first lawn recovery instead of green dye or cover-up",
