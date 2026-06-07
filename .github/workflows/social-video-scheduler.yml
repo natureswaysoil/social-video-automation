@@ -40,11 +40,11 @@ jobs:
         retry: [1, 2]
 
     env:
-      USE_SECRET_MANAGER: 'true'
+      USE_SECRET_MANAGER: ''
       DEFAULT_GOOGLE_CLOUD_PROJECT: natureswaysoil-video
       GOOGLE_CLOUD_PROJECT: natureswaysoil-video
-      DRY_RUN_LOG_ONLY: 'false'
       RUN_POSTING: 'true'
+      ALLOW_DIRECT_SECRETS_FALLBACK: 'false'
 
       VIDEO_PROVIDER: heygen
       ENABLE_PLATFORMS: youtube,instagram
@@ -111,7 +111,7 @@ jobs:
           CREDS_PATH="$RUNNER_TEMP/gcp-service-account.json"
           printf '%s' "$CREDS_JSON" > "$CREDS_PATH"
           chmod 600 "$CREDS_PATH"
-          PROJECT_FROM_JSON="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("project_id", ""))' "$CREDS_PATH" || true)"
+          PROJECT_FROM_JSON="$(jq -r '.project_id // ""' "$CREDS_PATH" 2>/dev/null || true)"
           EFFECTIVE_PROJECT="${GOOGLE_CLOUD_PROJECT_SECRET:-$PROJECT_FROM_JSON}"
           if [ -z "$EFFECTIVE_PROJECT" ]; then
             EFFECTIVE_PROJECT="$DEFAULT_GOOGLE_CLOUD_PROJECT"
@@ -154,7 +154,7 @@ jobs:
         run: |
           set -euo pipefail
           enabled_platforms="${ENABLE_PLATFORMS:-youtube,instagram}"
-          enabled_platforms="$(echo "$enabled_platforms" | tr '[:upper:]' '[:lower:]')"
+          enabled_platforms_lower="$(echo "$enabled_platforms" | tr '[:upper:]' '[:lower:]')"
           missing=()
           for name in OPENAI_API_KEY PEXELS_API_KEY; do
             if [ -z "${!name:-}" ]; then
@@ -163,7 +163,7 @@ jobs:
           done
           has_platform() {
             local platform="$1"
-            [[ ",$enabled_platforms," == *",$platform,"* ]]
+            [[ ",$enabled_platforms_lower," == *",$platform,"* ]]
           }
           has_any() {
             for key in "$@"; do
@@ -180,19 +180,26 @@ jobs:
           fi
           if has_platform instagram; then
             has_any INSTAGRAM_ACCESS_TOKEN || missing+=("INSTAGRAM_ACCESS_TOKEN")
-            has_any INSTAGRAM_IG_ID INSTAGRAM_USER_ID INSTAGRAM_ACCOUNT_ID || missing+=("INSTAGRAM_IG_ID|INSTAGRAM_USER_ID|INSTAGRAM_ACCOUNT_ID")
+            has_any INSTAGRAM_IG_ID INSTAGRAM_USER_ID INSTAGRAM_ACCOUNT_ID || missing+=("INSTAGRAM_IG_ID, INSTAGRAM_USER_ID, or INSTAGRAM_ACCOUNT_ID")
           fi
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Direct GitHub secrets fallback is missing required secrets for enabled platforms: ${missing[*]}."
             exit 1
           fi
-          echo "Direct GitHub repo secrets fallback validation passed for enabled platforms: $enabled_platforms"
+          echo "Direct GitHub repo secrets fallback validation passed for enabled platforms: $enabled_platforms_lower"
 
       - name: Enforce Google auth strategy
         run: |
           set -euo pipefail
-          if [ "${USE_SECRET_MANAGER:-false}" != "true" ]; then
-            echo "::error::Social Video Scheduler is configured for real posting and requires Google auth (OIDC or service-account JSON) for Secret Manager and GCS."
+          if [ "${USE_SECRET_MANAGER:-false}" = "true" ]; then
+            exit 0
+          fi
+          if [ "${ALLOW_DIRECT_SECRETS_FALLBACK:-false}" = "true" ]; then
+            echo "::warning::Using direct GitHub secrets fallback because ALLOW_DIRECT_SECRETS_FALLBACK=true."
+            exit 0
+          fi
+          if [ "${RUN_POSTING:-true}" = "true" ]; then
+            echo "::error::Social Video Scheduler real posting requires Google auth (OIDC or service-account JSON). Set ALLOW_DIRECT_SECRETS_FALLBACK=true only if you explicitly want non-standard fallback mode."
             exit 1
           fi
 
