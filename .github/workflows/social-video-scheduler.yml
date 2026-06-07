@@ -30,14 +30,171 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
       matrix:
         retry: [1, 2]
 
+    env:
+      USE_SECRET_MANAGER: 'true'
+      DEFAULT_GOOGLE_CLOUD_PROJECT: natureswaysoil-video
+      GOOGLE_CLOUD_PROJECT: natureswaysoil-video
+      DRY_RUN_LOG_ONLY: 'false'
+      RUN_POSTING: 'true'
+
+      VIDEO_PROVIDER: heygen
+      ENABLE_PLATFORMS: youtube,instagram
+      CI_MANDATORY_PLATFORMS: all
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-4o-mini
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+      INSTAGRAM_IG_ID: ${{ secrets.INSTAGRAM_IG_ID }}
+
+      GCS_PUBLIC_BUCKET: natureswaysoil-social-videos
+      VIDEO_PUBLIC_BUCKET: natureswaysoil-social-videos
+      VIDEO_PUBLIC_URL_BASE: https://storage.googleapis.com/natureswaysoil-social-videos
+
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ env.DEFAULT_GOOGLE_CLOUD_PROJECT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Prepare Google ADC credentials
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CLOUD_PROJECT_SECRET: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+            {
+              echo "GOOGLE_CLOUD_PROJECT=$DEFAULT_GOOGLE_CLOUD_PROJECT"
+              echo "GCLOUD_PROJECT=$DEFAULT_GOOGLE_CLOUD_PROJECT"
+              echo "GCP_PROJECT=$DEFAULT_GOOGLE_CLOUD_PROJECT"
+              echo "USE_SECRET_MANAGER=true"
+            } >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          CREDS_JSON="${GOOGLE_CREDENTIALS:-}"
+          if [ -z "$CREDS_JSON" ]; then
+            CREDS_JSON="${GOOGLE_SERVICE_ACCOUNT_JSON:-}"
+          fi
+
+          if [ -z "$CREDS_JSON" ]; then
+            echo "::warning::No OIDC context or GOOGLE_CREDENTIALS/GOOGLE_SERVICE_ACCOUNT_JSON secret found."
+            echo "USE_SECRET_MANAGER=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          CREDS_PATH="$RUNNER_TEMP/gcp-service-account.json"
+          printf '%s' "$CREDS_JSON" > "$CREDS_PATH"
+          chmod 600 "$CREDS_PATH"
+          PROJECT_FROM_JSON="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("project_id", ""))' "$CREDS_PATH" || true)"
+          EFFECTIVE_PROJECT="${GOOGLE_CLOUD_PROJECT_SECRET:-$PROJECT_FROM_JSON}"
+          if [ -z "$EFFECTIVE_PROJECT" ]; then
+            EFFECTIVE_PROJECT="$DEFAULT_GOOGLE_CLOUD_PROJECT"
+          fi
+          {
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$CREDS_PATH"
+            echo "GOOGLE_CLOUD_PROJECT=$EFFECTIVE_PROJECT"
+            echo "GCLOUD_PROJECT=$EFFECTIVE_PROJECT"
+            echo "GCP_PROJECT=$EFFECTIVE_PROJECT"
+            echo "USE_SECRET_MANAGER=true"
+          } >> "$GITHUB_ENV"
+
+      - name: Log auth context
+        run: |
+          set -euo pipefail
+          mode="direct-github-secrets"
+          if [ "${USE_SECRET_MANAGER:-false}" = "true" ]; then
+            if [ -n "${GOOGLE_GHA_CREDS_PATH:-}" ]; then
+              mode="google-oidc"
+            elif [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
+              mode="google-service-account-json"
+            else
+              mode="google-adc"
+            fi
+          fi
+
+          echo "Auth mode: $mode"
+          echo "Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
+          {
+            echo "### Social Video Scheduler Auth Context"
+            echo
+            echo "- Matrix retry: ${{ matrix.retry }}"
+            echo "- Auth mode: $mode"
+            echo "- Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
+            echo "- Secret Manager enabled: ${USE_SECRET_MANAGER:-false}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate direct GitHub secrets fallback
+        if: env.USE_SECRET_MANAGER == 'false'
+        run: |
+          set -euo pipefail
+          enabled_platforms="${ENABLE_PLATFORMS:-youtube,instagram}"
+          enabled_platforms="$(echo "$enabled_platforms" | tr '[:upper:]' '[:lower:]')"
+          missing=()
+          for name in OPENAI_API_KEY PEXELS_API_KEY; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          has_platform() {
+            local platform="$1"
+            [[ ",$enabled_platforms," == *",$platform,"* ]]
+          }
+          has_any() {
+            for key in "$@"; do
+              if [ -n "${!key:-}" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+          if has_platform youtube; then
+            has_any YOUTUBE_CLIENT_ID || missing+=("YOUTUBE_CLIENT_ID")
+            has_any YOUTUBE_CLIENT_SECRET || missing+=("YOUTUBE_CLIENT_SECRET")
+            has_any YOUTUBE_REFRESH_TOKEN || missing+=("YOUTUBE_REFRESH_TOKEN")
+          fi
+          if has_platform instagram; then
+            has_any INSTAGRAM_ACCESS_TOKEN || missing+=("INSTAGRAM_ACCESS_TOKEN")
+            has_any INSTAGRAM_IG_ID INSTAGRAM_USER_ID INSTAGRAM_ACCOUNT_ID || missing+=("INSTAGRAM_IG_ID|INSTAGRAM_USER_ID|INSTAGRAM_ACCOUNT_ID")
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Direct GitHub secrets fallback is missing required secrets for enabled platforms: ${missing[*]}."
+            exit 1
+          fi
+          echo "Direct GitHub repo secrets fallback validation passed for enabled platforms: $enabled_platforms"
+
+      - name: Enforce Google auth strategy
+        run: |
+          set -euo pipefail
+          if [ "${USE_SECRET_MANAGER:-false}" != "true" ]; then
+            echo "::error::Social Video Scheduler is configured for real posting and requires Google auth (OIDC or service-account JSON) for Secret Manager and GCS."
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -46,17 +203,5 @@ jobs:
       - run: npm install
 
       - name: Run scheduled automation
+        if: env.RUN_POSTING == 'true'
         run: npm run post:scheduled
-        env:
-          VIDEO_PROVIDER: heygen
-          ENABLE_PLATFORMS: youtube,instagram
-          CI_MANDATORY_PLATFORMS: all
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: gpt-4o-mini
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
-          INSTAGRAM_IG_ID: ${{ secrets.INSTAGRAM_IG_ID }}
