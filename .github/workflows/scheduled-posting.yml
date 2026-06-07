@@ -35,6 +35,7 @@ jobs:
       VARIATIONS_PER_PRODUCT: '5'
       NEXT_PRODUCT_PREFERRED_ID: NWS_021
       ENABLE_PLATFORMS: youtube,instagram,facebook
+      CI_MANDATORY_PLATFORMS: all
       YT_PRIVACY_STATUS: public
       DRY_RUN_LOG_ONLY: 'false'
       ROTATION_STATE_FILE: data/rotation-state.json
@@ -174,18 +175,51 @@ jobs:
         if: env.USE_SECRET_MANAGER == 'false'
         run: |
           set -euo pipefail
+          enabled_platforms="${ENABLE_PLATFORMS:-youtube,instagram,facebook}"
+          enabled_platforms="$(echo "$enabled_platforms" | tr '[:upper:]' '[:lower:]')"
           missing=()
           for name in OPENAI_API_KEY PEXELS_API_KEY; do
             if [ -z "${!name:-}" ]; then
               missing+=("$name")
             fi
           done
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::warning::Skipping post run. No Google service-account secret was found, and these required direct GitHub repo secrets are missing: ${missing[*]}. Add GOOGLE_SERVICE_ACCOUNT_JSON/GOOGLE_CREDENTIALS, or add the direct API secrets."
-            echo "RUN_POSTING=false" >> "$GITHUB_ENV"
-            exit 0
+          has_platform() {
+            local platform="$1"
+            [[ ",$enabled_platforms," == *",$platform,"* ]]
+          }
+          has_any() {
+            for key in "$@"; do
+              if [ -n "${!key:-}" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+          if has_platform youtube; then
+            has_any YOUTUBE_CLIENT_ID YT_CLIENT_ID || missing+=("YOUTUBE_CLIENT_ID|YT_CLIENT_ID")
+            has_any YOUTUBE_CLIENT_SECRET YT_CLIENT_SECRET || missing+=("YOUTUBE_CLIENT_SECRET|YT_CLIENT_SECRET")
+            has_any YOUTUBE_REFRESH_TOKEN YT_REFRESH_TOKEN || missing+=("YOUTUBE_REFRESH_TOKEN|YT_REFRESH_TOKEN")
           fi
-          echo "Using direct GitHub repo secrets fallback."
+          if has_platform instagram; then
+            has_any INSTAGRAM_ACCESS_TOKEN || missing+=("INSTAGRAM_ACCESS_TOKEN")
+            has_any INSTAGRAM_IG_ID INSTAGRAM_USER_ID INSTAGRAM_ACCOUNT_ID || missing+=("INSTAGRAM_IG_ID|INSTAGRAM_USER_ID|INSTAGRAM_ACCOUNT_ID")
+          fi
+          if has_platform facebook; then
+            has_any FACEBOOK_PAGE_ACCESS_TOKEN FB_PAGE_ACCESS_TOKEN || missing+=("FACEBOOK_PAGE_ACCESS_TOKEN|FB_PAGE_ACCESS_TOKEN")
+            has_any FACEBOOK_PAGE_ID FB_PAGE_ID || missing+=("FACEBOOK_PAGE_ID|FB_PAGE_ID")
+          fi
+          if has_platform tiktok; then
+            has_any TIKTOK_ACCESS_TOKEN || missing+=("TIKTOK_ACCESS_TOKEN")
+            has_any TIKTOK_OPEN_ID || missing+=("TIKTOK_OPEN_ID")
+          fi
+          if has_platform facebook_groups; then
+            has_any FACEBOOK_GROUPS_ACCESS_TOKEN || missing+=("FACEBOOK_GROUPS_ACCESS_TOKEN")
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Direct GitHub secrets fallback is missing required secrets for enabled platforms: ${missing[*]}."
+            exit 1
+          fi
+          echo "Using direct GitHub repo secrets fallback for all enabled platforms: $enabled_platforms"
 
       - name: Skip run when posting is not configured
         if: env.RUN_POSTING == 'false'

@@ -76,10 +76,18 @@ function secretCandidates(name) {
     const lowerUnderscore = upper.toLowerCase();
     return [...new Set([upper, lowerHyphen, name, name.replace(/_/g, '-'), lowerUnderscore])];
 }
+function isNotFoundSecretError(error) {
+    return Number(error?.code) === 5 || String(error?.message || '').toUpperCase().includes('NOT_FOUND');
+}
+function isPermissionDeniedSecretError(error) {
+    const message = String(error?.message || '').toUpperCase();
+    return Number(error?.code) === 7 || message.includes('PERMISSION_DENIED') || message.includes('PERMISSION DENIED');
+}
 async function loadSecrets() {
     const useSecretManager = String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() !== 'false';
     if (!useSecretManager)
         return;
+    const enforceSecretManagerAccess = String(process.env.REQUIRE_SECRET_MANAGER_ACCESS || process.env.CI || '').toLowerCase() === 'true';
     const dryRun = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true';
     const hasAdc = !!process.env.GOOGLE_APPLICATION_CREDENTIALS || !!process.env.GOOGLE_GHA_CREDS_PATH;
     if (dryRun && !hasAdc) {
@@ -89,7 +97,7 @@ async function loadSecrets() {
     const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'natureswaysoil-video';
     const client = new secret_manager_1.SecretManagerServiceClient();
     for (const secretName of SECRET_NAMES) {
-        if (hasValue(secretName))
+        if (hasValue(secretName) && !enforceSecretManagerAccess)
             continue;
         for (const candidate of secretCandidates(secretName)) {
             try {
@@ -103,8 +111,11 @@ async function loadSecrets() {
                 }
             }
             catch (error) {
-                if (Number(error?.code) === 5 || String(error?.message || '').includes('NOT_FOUND'))
+                if (isNotFoundSecretError(error))
                     continue;
+                if (isPermissionDeniedSecretError(error)) {
+                    throw new Error(`Secret Manager permission denied for ${candidate}: ${error?.message || error}`);
+                }
                 log(`Could not load secret ${candidate}: ${error?.message || error}`);
                 break;
             }
@@ -288,6 +299,13 @@ function pickEnv(keys) {
 }
 function isHttpUrl(value) {
     return /^https?:\/\//i.test(String(value || ''));
+}
+function isCiMandatoryPlatformMode() {
+    if (String(process.env.CI_MANDATORY_PLATFORMS || '').toLowerCase() === 'all')
+        return true;
+    if (String(process.env.CI_MANDATORY_PLATFORMS || '').toLowerCase() === 'enabled')
+        return true;
+    return String(process.env.CI || '').toLowerCase() === 'true';
 }
 function publicBucketName() {
     return pickEnv(['GCS_PUBLIC_BUCKET', 'VIDEO_PUBLIC_BUCKET']) || DEFAULT_PUBLIC_VIDEO_BUCKET;
@@ -531,7 +549,8 @@ async function main() {
     log('Creative mapping selected', { hasScenePlan: !!profile.scenes?.length, hasProductImage: !!product.productImageUrl, brollQueries: product.brollQueries?.length || 0 });
     const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount);
     log('Generated scene plan', { fullVoiceoverLength: scenePlan.fullVoiceover.length, scenes: scenePlan.scenes.map((scene, index) => ({ idx: index + 1, name: scene.name, seconds: scene.seconds, useProductImage: !!scene.useProductImage, brollQuery: scene.brollQuery })) });
-    const platforms = (process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean);
+    const platforms = Array.from(new Set((process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook').toLowerCase().split(',').map((p) => p.trim()).filter(Boolean)));
+    const mandatoryPlatformMode = isCiMandatoryPlatformMode();
     const captions = {
         youtube: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'youtube'),
         instagram: (0, caption_formatter_1.formatCaption)(product, scenePlan, 'instagram'),
@@ -557,14 +576,19 @@ async function main() {
     }
     let posted = 0;
     const videoIds = {};
+    const platformSuccess = {};
+    const platformErrors = {};
     if (platforms.includes('youtube')) {
         try {
             const id = await postToYouTube(videoFile, product.name, captions.youtube, thumbnailFile);
             posted++;
             videoIds.youtubeId = id;
+            platformSuccess.youtube = true;
             log('Posted to YouTube', { id });
         }
         catch (error) {
+            platformSuccess.youtube = false;
+            platformErrors.youtube = String(error?.message || error);
             log('YouTube post failed', error?.message || error);
         }
     }
@@ -573,9 +597,12 @@ async function main() {
             const id = await postToInstagram(publicVideoUrl, captions.instagram);
             posted++;
             videoIds.instagramId = id;
+            platformSuccess.instagram = true;
             log('Posted to Instagram', { id });
         }
         catch (error) {
+            platformSuccess.instagram = false;
+            platformErrors.instagram = String(error?.message || error);
             log('Instagram post failed', error?.message || error);
         }
     }
@@ -584,20 +611,29 @@ async function main() {
             const id = await postToFacebook(publicVideoUrl, captions.facebook);
             posted++;
             videoIds.facebookId = id;
+            platformSuccess.facebook = true;
             log('Posted to Facebook', { id });
         }
         catch (error) {
+            platformSuccess.facebook = false;
+            platformErrors.facebook = String(error?.message || error);
             log('Facebook post failed', error?.message || error);
         }
     }
     if (platforms.includes('tiktok')) {
         try {
             const result = await (0, social_platforms_1.postToTikTok)(publicVideoUrl, captions.tiktok);
-            if (!result?.skipped)
+            const skipped = !!result?.skipped;
+            if (!skipped)
                 posted++;
+            platformSuccess.tiktok = !skipped;
+            if (skipped)
+                platformErrors.tiktok = 'TikTok posting skipped';
             log('Posted to TikTok', result);
         }
         catch (error) {
+            platformSuccess.tiktok = false;
+            platformErrors.tiktok = String(error?.message || error);
             log('TikTok post failed', error?.message || error);
         }
     }
@@ -607,9 +643,14 @@ async function main() {
             const successes = results.filter((item) => item.ok).length;
             if (successes > 0)
                 posted += successes;
+            platformSuccess.facebook_groups = successes > 0;
+            if (successes === 0)
+                platformErrors.facebook_groups = 'No Facebook group posts succeeded';
             log('Facebook group posting completed', { attempts: results.length, successes });
         }
         catch (error) {
+            platformSuccess.facebook_groups = false;
+            platformErrors.facebook_groups = String(error?.message || error);
             log('Facebook groups post failed', error?.message || error);
         }
     }
@@ -626,6 +667,13 @@ async function main() {
         videoIds,
         analyticsFile: VIDEO_ANALYTICS_FILE
     });
+    if (mandatoryPlatformMode) {
+        const failedMandatory = platforms.filter((platform) => !platformSuccess[platform]);
+        if (failedMandatory.length) {
+            const detail = failedMandatory.map((platform) => `${platform}: ${platformErrors[platform] || 'post did not succeed'}`).join('; ');
+            throw new Error(`Mandatory enabled platform posting failed (${detail})`);
+        }
+    }
     if (posted === 0)
         throw new Error('No platform posts succeeded');
     log('Scheduled post completed', { posted, videoFile, publicVideoUrl, thumbnailFile, videoIds, metrics });
