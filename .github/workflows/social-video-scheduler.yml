@@ -49,6 +49,8 @@ jobs:
         run: npm run post:scheduled
         env:
           VIDEO_PROVIDER: heygen
+          ENABLE_PLATFORMS: youtube,instagram
+          CI_MANDATORY_PLATFORMS: all
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-4o-mini
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
