@@ -24,7 +24,12 @@ const SECRET_ALIASES = {
     YOUTUBE_CLIENT_SECRET: ['YOUTUBE_CLIENT_SECRET', 'YT_CLIENT_SECRET'],
     YOUTUBE_REFRESH_TOKEN: ['YOUTUBE_REFRESH_TOKEN', 'YT_REFRESH_TOKEN'],
     INSTAGRAM_ACCESS_TOKEN: ['INSTAGRAM_ACCESS_TOKEN'],
-    INSTAGRAM_IG_ID: ['INSTAGRAM_IG_ID', 'INSTAGRAM_USER_ID', 'INSTAGRAM_ACCOUNT_ID']
+    INSTAGRAM_IG_ID: ['INSTAGRAM_IG_ID', 'INSTAGRAM_USER_ID', 'INSTAGRAM_ACCOUNT_ID'],
+    FACEBOOK_PAGE_ACCESS_TOKEN: ['FACEBOOK_PAGE_ACCESS_TOKEN', 'FB_PAGE_ACCESS_TOKEN'],
+    FACEBOOK_PAGE_ID: ['FACEBOOK_PAGE_ID', 'FB_PAGE_ID'],
+    FACEBOOK_GROUPS_ACCESS_TOKEN: ['FACEBOOK_GROUPS_ACCESS_TOKEN'],
+    TIKTOK_ACCESS_TOKEN: ['TIKTOK_ACCESS_TOKEN'],
+    TIKTOK_OPEN_ID: ['TIKTOK_OPEN_ID']
 };
 function good(value) {
     return !!value && !/your_|your-|changeme|placeholder|paste_|replace_/i.test(value);
@@ -32,6 +37,13 @@ function good(value) {
 function normalizeCandidates(name) {
     const upper = name.replace(/[\s-]+/g, '_').toUpperCase();
     return [...new Set([name, upper, upper.toLowerCase(), upper.toLowerCase().replace(/_/g, '-')])];
+}
+function isNotFoundSecretError(error) {
+    return Number(error?.code) === 5 || String(error?.message || '').toUpperCase().includes('NOT_FOUND');
+}
+function isPermissionDeniedSecretError(error) {
+    const message = String(error?.message || '').toUpperCase();
+    return Number(error?.code) === 7 || message.includes('PERMISSION_DENIED') || message.includes('PERMISSION DENIED');
 }
 async function loadSecretIfPresent(name) {
     if (good(process.env[name]))
@@ -51,8 +63,11 @@ async function loadSecretIfPresent(name) {
             }
         }
         catch (error) {
-            if (Number(error?.code) === 5 || String(error?.message || '').includes('NOT_FOUND'))
+            if (isNotFoundSecretError(error))
                 continue;
+            if (isPermissionDeniedSecretError(error)) {
+                throw new Error(`Secret Manager permission denied for ${alias}: ${error?.message || error}`);
+            }
         }
     }
     return false;
@@ -110,12 +125,18 @@ function checkScenePlanCoverage() {
 async function main() {
     const dryRunLogOnly = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true';
     const provider = String(process.env.VIDEO_PROVIDER || 'openai_tts').toLowerCase();
-    const platforms = String(process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+    const platforms = String(process.env.ENABLE_PLATFORMS || 'youtube,instagram,facebook').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
     const requiredSecrets = ['OPENAI_API_KEY', 'PEXELS_API_KEY'];
     if (platforms.includes('youtube'))
         requiredSecrets.push('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REFRESH_TOKEN');
     if (platforms.includes('instagram'))
         requiredSecrets.push('INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_IG_ID');
+    if (platforms.includes('facebook'))
+        requiredSecrets.push('FACEBOOK_PAGE_ACCESS_TOKEN', 'FACEBOOK_PAGE_ID');
+    if (platforms.includes('facebook_groups'))
+        requiredSecrets.push('FACEBOOK_GROUPS_ACCESS_TOKEN');
+    if (platforms.includes('tiktok'))
+        requiredSecrets.push('TIKTOK_ACCESS_TOKEN', 'TIKTOK_OPEN_ID');
     const results = [];
     results.push(...checkFiles());
     results.push(checkScenePlanCoverage());
