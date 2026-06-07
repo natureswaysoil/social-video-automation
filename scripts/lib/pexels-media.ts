@@ -11,6 +11,28 @@ function trimQuery(query: string, words = 4) {
   return String(query || '').split(/\s+/).filter(Boolean).slice(0, words).join(' ')
 }
 
+function uniqQueries(items: string[]) {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const item of items) {
+    const value = String(item || '').trim()
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+  }
+  return out
+}
+
+export function buildSceneQueryPriority(scene: any, product: any, index = 0) {
+  const scenePrimary = String(scene?.brollQuery || '').trim()
+  const sceneList = Array.isArray(scene?.brollQueries) ? scene.brollQueries : []
+  const productFallback = Array.isArray(product?.brollQueries) ? product.brollQueries[index] : ''
+  const categoryFallback = String(product?.category || '').trim()
+  return uniqQueries([scenePrimary, ...sceneList, productFallback, categoryFallback])
+}
+
 /**
  * Build the search attempts for a query. We keep the attempts CLOSE to the
  * product (full query -> trimmed query) and only fall back to a generic term
@@ -139,4 +161,19 @@ export async function downloadPexelsPhoto(query: string, outputDir: string, inde
   const ext = (url.split('?')[0].toLowerCase().endsWith('.png')) ? 'png' : 'jpg'
   const file = path.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-img-${safeFileName(query, ext)}`)
   return await downloadUrl(url, file)
+}
+
+export async function fetchBrollForScene(scene: any, product: any, outputDir: string, index = 0) {
+  const attempts = buildSceneQueryPriority(scene, product, index)
+  for (const query of attempts) {
+    try {
+      const videoFile = await downloadPexelsVideo(query, outputDir, index)
+      if (videoFile) return { file: videoFile, kind: 'video', query }
+    } catch {}
+    try {
+      const photoFile = await downloadPexelsPhoto(query, outputDir, index)
+      if (photoFile) return { file: photoFile, kind: 'photo', query }
+    } catch {}
+  }
+  return null
 }

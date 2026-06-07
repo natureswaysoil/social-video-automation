@@ -9,7 +9,7 @@ import { google } from 'googleapis'
 import { Storage } from '@google-cloud/storage'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import { composeVerticalAd } from './lib/ffmpeg-compositor'
-import { downloadPexelsVideo } from './lib/pexels-media'
+import { buildSceneQueryPriority, fetchBrollForScene } from './lib/pexels-media'
 import { downloadProductImage, productOverlayText } from './lib/product-assets'
 import { ensureDir, safeFileName } from './lib/video-utils'
 import { createNarration } from './lib/video-provider'
@@ -44,6 +44,14 @@ type CreativeScene = {
   brollQuery?: string
   caption?: string
   useProductImage?: boolean
+}
+
+type RenderScene = {
+  file: string
+  seconds: number
+  kind: 'video' | 'photo' | 'product'
+  query?: string
+  source?: 'product_image' | 'local' | 'pexels_video' | 'pexels_photo'
 }
 
 type CreativeProfile = {
@@ -87,8 +95,6 @@ const SECRET_NAMES = [
   'FACEBOOK_GROUPS_ACCESS_TOKEN',
   'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_OPEN_ID',
-  'DID_API_KEY',
-  'DiD',
   'GCS_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_URL_BASE'
@@ -223,10 +229,8 @@ function productCreativeProfile(product: Product): CreativeProfile {
   return { ...(creative.defaults || {}), ...((creative.profiles || {})[product.id] || {}) }
 }
 
-function firstQuery(scene: CreativeScene, fallback: string) {
-  if (scene.brollQuery) return scene.brollQuery
-  if (Array.isArray(scene.brollQueries) && scene.brollQueries.length) return scene.brollQueries[0]
-  return fallback
+function sceneQueries(scene: CreativeScene, product: Product, index: number) {
+  return buildSceneQueryPriority(scene, product, index)
 }
 
 function curatedScenePlan(product: Product, profile: CreativeProfile): { fullVoiceover: string, scenes: CreativeScene[] } | null {
@@ -235,7 +239,8 @@ function curatedScenePlan(product: Product, profile: CreativeProfile): { fullVoi
     name: scene.name || `scene-${index + 1}`,
     seconds: Number(scene.seconds || 6),
     voiceover: scene.voiceover || '',
-    brollQuery: firstQuery(scene, product.brollQueries?.[index] || product.category),
+    brollQuery: sceneQueries(scene, product, index)[0] || product.category,
+    brollQueries: sceneQueries(scene, product, index),
     caption: scene.caption || scene.name || product.name,
     useProductImage: Boolean(scene.useProductImage) || index === 1 || index === profile.scenes!.length - 1
   }))
@@ -447,28 +452,67 @@ async function collectSceneFiles(product: Product, scenePlan: any) {
   ensureDir(TEMP_DIR)
   ensureDir(FOOTAGE_DIR)
   const productImage = await downloadProductImage(product, TEMP_DIR)
-  const sceneFiles: string[] = []
   const local = localFootageCandidates(product)
-  for (const file of local.slice(0, 5)) sceneFiles.push(file)
+  const usedLocal = new Set<string>()
+  const scenes: RenderScene[] = []
 
-  for (const scene of scenePlan.scenes || []) {
-    if (sceneFiles.length >= 5) break
-    if (scene.useProductImage && productImage) {
-      sceneFiles.push(productImage)
-      continue
+  function pickLocalForScene(scene: CreativeScene, index: number) {
+    const queries = sceneQueries(scene, product, index)
+    const words = `${scene.name || ''} ${scene.caption || ''} ${queries.join(' ')}`.toLowerCase().match(/[a-z0-9]+/g) || []
+    const keywords = words.filter((word) => word.length >= 4)
+    const rank = (file: string) => {
+      const name = path.basename(file).toLowerCase()
+      let score = 0
+      for (const word of keywords) if (name.includes(word)) score += 3
+      if (/dog|pet|urine|odor|kennel/.test((scene.name || '') + ' ' + (scene.caption || '') + ' ' + queries.join(' ')) && /dog|pet|urine|odor|kennel/.test(name)) score += 8
+      if (/pasture|hay|field|farm|acre/.test((scene.name || '') + ' ' + queries.join(' ')) && /pasture|hay|field|farm|acre/.test(name)) score += 8
+      if (/compost|biochar|worm|soil|garden/.test((scene.name || '') + ' ' + queries.join(' ')) && /compost|biochar|worm|soil|garden|plant/.test(name)) score += 8
+      if (/spray|hose|before|after|product|bottle|jug/.test(name)) score += 2
+      return score
     }
-    const query = scene.brollQuery || product.brollQueries?.[sceneFiles.length] || product.category
-    try {
-      const file = await downloadPexelsVideo(query, TEMP_DIR, sceneFiles.length)
-      if (file) sceneFiles.push(file)
-    } catch (error: any) {
-      log('B-roll download failed', { query, error: error?.message || error })
-    }
+    const candidate = local
+      .filter((file) => !usedLocal.has(file))
+      .map((file) => ({ file, score: rank(file) }))
+      .sort((a, b) => b.score - a.score)[0]
+    return candidate && candidate.score > 0 ? candidate.file : ''
   }
 
-  if (!sceneFiles.length && productImage) sceneFiles.push(productImage)
-  if (!sceneFiles.length) throw new Error('No b-roll or product images available. Add files to footage/, add productImageUrl, or configure PEXELS_API_KEY.')
-  return { sceneFiles, productImage }
+  for (const [index, rawScene] of (scenePlan.scenes || []).slice(0, 5).entries()) {
+    const scene = rawScene || {}
+    const seconds = Number(scene.seconds || 6)
+    if (scene.useProductImage && productImage) {
+      scenes.push({ file: productImage, seconds, kind: 'product', source: 'product_image' })
+      continue
+    }
+
+    const localFile = pickLocalForScene(scene, index)
+    if (localFile) {
+      usedLocal.add(localFile)
+      scenes.push({ file: localFile, seconds, kind: 'video', source: 'local', query: sceneQueries(scene, product, index)[0] || '' })
+      continue
+    }
+
+    const fetched = await fetchBrollForScene(scene, product, TEMP_DIR, index)
+    if (fetched?.file) {
+      scenes.push({
+        file: fetched.file,
+        seconds,
+        kind: fetched.kind,
+        query: fetched.query,
+        source: fetched.kind === 'photo' ? 'pexels_photo' : 'pexels_video'
+      })
+      continue
+    }
+
+    if (productImage) {
+      scenes.push({ file: productImage, seconds, kind: 'product', source: 'product_image' })
+      continue
+    }
+    log('No media source available for scene', { index: index + 1, name: scene.name, queries: sceneQueries(scene, product, index) })
+  }
+
+  if (!scenes.length) throw new Error('No b-roll or product images available. Add files to footage/, add productImageUrl, or configure PEXELS_API_KEY.')
+  return { scenes, productImage }
 }
 
 function hookText(product: Product, scenePlan: any) {
@@ -477,25 +521,28 @@ function hookText(product: Product, scenePlan: any) {
 }
 
 async function renderVideo(product: Product, profile: CreativeProfile, scenePlan: any): Promise<string> {
-  const { sceneFiles, productImage } = await collectSceneFiles(product, scenePlan)
-  const sceneDurations = (scenePlan.scenes || []).map((scene: CreativeScene) => Number(scene.seconds || 6))
+  const { scenes, productImage } = await collectSceneFiles(product, scenePlan)
   const voiceoverFile = await createNarration(product, scenePlan, profile, TEMP_DIR)
   const videoFile = await composeVerticalAd({
     outputName: `${safeFileName(product.name)}-scheduled.mp4`,
-    sceneFiles,
-    sceneDurations,
+    scenes,
     productImage,
     voiceoverFile,
     captionText: hookText(product, scenePlan),
     overlayText: productOverlayText(product)
   })
-  log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage, hasNarration: !!voiceoverFile })
+  log('Rendered b-roll Ken Burns video', {
+    videoFile,
+    scenes: scenes.map((scene) => ({ kind: scene.kind, source: scene.source, query: scene.query, seconds: scene.seconds })),
+    productImage: !!productImage,
+    hasNarration: !!voiceoverFile
+  })
   return videoFile
 }
 
 async function main() {
   process.env.VIDEO_STYLE = String(process.env.VIDEO_STYLE || 'broll_ken_burns').toLowerCase()
-  process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase()
+  process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'openai_tts').toLowerCase()
   await loadSecrets()
   await restoreRotationStateFromGcs()
   const products = loadProducts()
