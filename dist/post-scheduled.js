@@ -53,8 +53,6 @@ const SECRET_NAMES = [
     'FACEBOOK_GROUPS_ACCESS_TOKEN',
     'TIKTOK_ACCESS_TOKEN',
     'TIKTOK_OPEN_ID',
-    'DID_API_KEY',
-    'DiD',
     'GCS_PUBLIC_BUCKET',
     'VIDEO_PUBLIC_BUCKET',
     'VIDEO_PUBLIC_URL_BASE'
@@ -192,12 +190,8 @@ function productCreativeProfile(product) {
     const creative = readJson(CREATIVE_PATH, { defaults: {}, profiles: {} });
     return { ...(creative.defaults || {}), ...((creative.profiles || {})[product.id] || {}) };
 }
-function firstQuery(scene, fallback) {
-    if (scene.brollQuery)
-        return scene.brollQuery;
-    if (Array.isArray(scene.brollQueries) && scene.brollQueries.length)
-        return scene.brollQueries[0];
-    return fallback;
+function sceneQueries(scene, product, index) {
+    return (0, pexels_media_1.buildSceneQueryPriority)(scene, product, index);
 }
 function curatedScenePlan(product, profile) {
     if (!Array.isArray(profile.scenes) || !profile.scenes.length)
@@ -206,7 +200,8 @@ function curatedScenePlan(product, profile) {
         name: scene.name || `scene-${index + 1}`,
         seconds: Number(scene.seconds || 6),
         voiceover: scene.voiceover || '',
-        brollQuery: firstQuery(scene, product.brollQueries?.[index] || product.category),
+        brollQuery: sceneQueries(scene, product, index)[0] || product.category,
+        brollQueries: sceneQueries(scene, product, index),
         caption: scene.caption || scene.name || product.name,
         useProductImage: Boolean(scene.useProductImage) || index === 1 || index === profile.scenes.length - 1
     }));
@@ -436,56 +431,94 @@ async function collectSceneFiles(product, scenePlan) {
     (0, video_utils_1.ensureDir)(TEMP_DIR);
     (0, video_utils_1.ensureDir)(FOOTAGE_DIR);
     const productImage = await (0, product_assets_1.downloadProductImage)(product, TEMP_DIR);
-    const sceneFiles = [];
     const local = localFootageCandidates(product);
-    for (const file of local.slice(0, 5))
-        sceneFiles.push(file);
-    for (const scene of scenePlan.scenes || []) {
-        if (sceneFiles.length >= 5)
-            break;
+    const usedLocal = new Set();
+    const scenes = [];
+    const hasKeywordMatch = (text, fileName, textPattern, filePattern, weight) => textPattern.test(text) && filePattern.test(fileName) ? weight : 0;
+    function pickLocalForScene(scene, index) {
+        const queries = sceneQueries(scene, product, index);
+        const sceneText = `${scene.name || ''} ${scene.caption || ''} ${queries.join(' ')}`.toLowerCase();
+        const words = sceneText.match(/[a-z0-9]+/g) || [];
+        const keywords = words.filter((word) => word.length >= 4);
+        const rank = (file) => {
+            const name = path_1.default.basename(file).toLowerCase();
+            let score = 0;
+            for (const word of keywords)
+                if (name.includes(word))
+                    score += 3;
+            score += hasKeywordMatch(sceneText, name, /dog|pet|urine|odor|kennel/, /dog|pet|urine|odor|kennel/, 8);
+            score += hasKeywordMatch(sceneText, name, /pasture|hay|field|farm|acre/, /pasture|hay|field|farm|acre/, 8);
+            score += hasKeywordMatch(sceneText, name, /compost|biochar|worm|soil|garden/, /compost|biochar|worm|soil|garden|plant/, 8);
+            if (/spray|hose|before|after|product|bottle|jug/.test(name))
+                score += 2;
+            return score;
+        };
+        const candidate = local
+            .filter((file) => !usedLocal.has(file))
+            .map((file) => ({ file, score: rank(file) }))
+            .sort((a, b) => b.score - a.score)[0];
+        return candidate && candidate.score > 0 ? candidate.file : '';
+    }
+    for (const [index, rawScene] of (scenePlan.scenes || []).slice(0, 5).entries()) {
+        const scene = rawScene || {};
+        const seconds = Number(scene.seconds || 6);
         if (scene.useProductImage && productImage) {
-            sceneFiles.push(productImage);
+            scenes.push({ file: productImage, seconds, kind: 'product', source: 'product_image' });
             continue;
         }
-        const query = scene.brollQuery || product.brollQueries?.[sceneFiles.length] || product.category;
-        try {
-            const file = await (0, pexels_media_1.downloadPexelsVideo)(query, TEMP_DIR, sceneFiles.length);
-            if (file)
-                sceneFiles.push(file);
+        const localFile = pickLocalForScene(scene, index);
+        if (localFile) {
+            usedLocal.add(localFile);
+            scenes.push({ file: localFile, seconds, kind: 'video', source: 'local', query: sceneQueries(scene, product, index)[0] || '' });
+            continue;
         }
-        catch (error) {
-            log('B-roll download failed', { query, error: error?.message || error });
+        const fetched = await (0, pexels_media_1.fetchBrollForScene)(scene, product, TEMP_DIR, index);
+        if (fetched?.file) {
+            scenes.push({
+                file: fetched.file,
+                seconds,
+                kind: fetched.kind,
+                query: fetched.query,
+                source: fetched.kind === 'photo' ? 'pexels_photo' : 'pexels_video'
+            });
+            continue;
         }
+        if (productImage) {
+            scenes.push({ file: productImage, seconds, kind: 'product', source: 'product_image' });
+            continue;
+        }
+        log('No media source available for scene', { index: index + 1, name: scene.name, queries: sceneQueries(scene, product, index) });
     }
-    if (!sceneFiles.length && productImage)
-        sceneFiles.push(productImage);
-    if (!sceneFiles.length)
+    if (!scenes.length)
         throw new Error('No b-roll or product images available. Add files to footage/, add productImageUrl, or configure PEXELS_API_KEY.');
-    return { sceneFiles, productImage };
+    return { scenes, productImage };
 }
 function hookText(product, scenePlan) {
     const firstScene = scenePlan.scenes?.[0];
     return String(firstScene?.caption || firstScene?.name || product.name).slice(0, 80).toUpperCase();
 }
 async function renderVideo(product, profile, scenePlan) {
-    const { sceneFiles, productImage } = await collectSceneFiles(product, scenePlan);
-    const sceneDurations = (scenePlan.scenes || []).map((scene) => Number(scene.seconds || 6));
+    const { scenes, productImage } = await collectSceneFiles(product, scenePlan);
     const voiceoverFile = await (0, video_provider_1.createNarration)(product, scenePlan, profile, TEMP_DIR);
     const videoFile = await (0, ffmpeg_compositor_1.composeVerticalAd)({
         outputName: `${(0, video_utils_1.safeFileName)(product.name)}-scheduled.mp4`,
-        sceneFiles,
-        sceneDurations,
+        scenes,
         productImage,
         voiceoverFile,
         captionText: hookText(product, scenePlan),
         overlayText: (0, product_assets_1.productOverlayText)(product)
     });
-    log('Rendered b-roll Ken Burns video', { videoFile, scenes: sceneFiles.length, productImage: !!productImage, hasNarration: !!voiceoverFile });
+    log('Rendered b-roll Ken Burns video', {
+        videoFile,
+        scenes: scenes.map((scene) => ({ kind: scene.kind, source: scene.source, query: scene.query, seconds: scene.seconds })),
+        productImage: !!productImage,
+        hasNarration: !!voiceoverFile
+    });
     return videoFile;
 }
 async function main() {
     process.env.VIDEO_STYLE = String(process.env.VIDEO_STYLE || 'broll_ken_burns').toLowerCase();
-    process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase();
+    process.env.VIDEO_PROVIDER = String(process.env.VIDEO_PROVIDER || 'openai_tts').toLowerCase();
     await loadSecrets();
     await restoreRotationStateFromGcs();
     const products = loadProducts();

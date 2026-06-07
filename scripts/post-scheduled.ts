@@ -455,18 +455,21 @@ async function collectSceneFiles(product: Product, scenePlan: any) {
   const local = localFootageCandidates(product)
   const usedLocal = new Set<string>()
   const scenes: RenderScene[] = []
+  const hasKeywordMatch = (text: string, fileName: string, textPattern: RegExp, filePattern: RegExp, weight: number) =>
+    textPattern.test(text) && filePattern.test(fileName) ? weight : 0
 
   function pickLocalForScene(scene: CreativeScene, index: number) {
     const queries = sceneQueries(scene, product, index)
-    const words = `${scene.name || ''} ${scene.caption || ''} ${queries.join(' ')}`.toLowerCase().match(/[a-z0-9]+/g) || []
+    const sceneText = `${scene.name || ''} ${scene.caption || ''} ${queries.join(' ')}`.toLowerCase()
+    const words = sceneText.match(/[a-z0-9]+/g) || []
     const keywords = words.filter((word) => word.length >= 4)
     const rank = (file: string) => {
       const name = path.basename(file).toLowerCase()
       let score = 0
       for (const word of keywords) if (name.includes(word)) score += 3
-      if (/dog|pet|urine|odor|kennel/.test((scene.name || '') + ' ' + (scene.caption || '') + ' ' + queries.join(' ')) && /dog|pet|urine|odor|kennel/.test(name)) score += 8
-      if (/pasture|hay|field|farm|acre/.test((scene.name || '') + ' ' + queries.join(' ')) && /pasture|hay|field|farm|acre/.test(name)) score += 8
-      if (/compost|biochar|worm|soil|garden/.test((scene.name || '') + ' ' + queries.join(' ')) && /compost|biochar|worm|soil|garden|plant/.test(name)) score += 8
+      score += hasKeywordMatch(sceneText, name, /dog|pet|urine|odor|kennel/, /dog|pet|urine|odor|kennel/, 8)
+      score += hasKeywordMatch(sceneText, name, /pasture|hay|field|farm|acre/, /pasture|hay|field|farm|acre/, 8)
+      score += hasKeywordMatch(sceneText, name, /compost|biochar|worm|soil|garden/, /compost|biochar|worm|soil|garden|plant/, 8)
       if (/spray|hose|before|after|product|bottle|jug/.test(name)) score += 2
       return score
     }

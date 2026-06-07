@@ -3,11 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildSceneQueryPriority = buildSceneQueryPriority;
 exports.findPexelsVideoUrl = findPexelsVideoUrl;
 exports.findPexelsPhotoUrl = findPexelsPhotoUrl;
 exports.downloadUrl = downloadUrl;
 exports.downloadPexelsVideo = downloadPexelsVideo;
 exports.downloadPexelsPhoto = downloadPexelsPhoto;
+exports.fetchBrollForScene = fetchBrollForScene;
 // @ts-nocheck
 const axios_1 = __importDefault(require("axios"));
 const fs_1 = __importDefault(require("fs"));
@@ -17,6 +19,28 @@ const PEXELS_VIDEO_API = 'https://api.pexels.com/videos/search';
 const PEXELS_PHOTO_API = 'https://api.pexels.com/v1/search';
 function trimQuery(query, words = 4) {
     return String(query || '').split(/\s+/).filter(Boolean).slice(0, words).join(' ');
+}
+function uniqQueries(items) {
+    const seen = new Set();
+    const out = [];
+    for (const item of items) {
+        const value = String(item || '').trim();
+        if (!value)
+            continue;
+        const key = value.toLowerCase();
+        if (seen.has(key))
+            continue;
+        seen.add(key);
+        out.push(value);
+    }
+    return out;
+}
+function buildSceneQueryPriority(scene, product, index = 0) {
+    const scenePrimary = String(scene?.brollQuery || '').trim();
+    const sceneList = Array.isArray(scene?.brollQueries) ? scene.brollQueries : [];
+    const productFallback = Array.isArray(product?.brollQueries) ? product.brollQueries[index] : '';
+    const categoryFallback = String(product?.category || '').trim();
+    return uniqQueries([scenePrimary, ...sceneList, productFallback, categoryFallback]);
 }
 /**
  * Build the search attempts for a query. We keep the attempts CLOSE to the
@@ -140,4 +164,22 @@ async function downloadPexelsPhoto(query, outputDir, index = 0) {
     const ext = (url.split('?')[0].toLowerCase().endsWith('.png')) ? 'png' : 'jpg';
     const file = path_1.default.resolve(outputDir, `${String(index + 1).padStart(2, '0')}-img-${(0, video_utils_1.safeFileName)(query, ext)}`);
     return await downloadUrl(url, file);
+}
+async function fetchBrollForScene(scene, product, outputDir, index = 0) {
+    const attempts = buildSceneQueryPriority(scene, product, index);
+    for (const query of attempts) {
+        try {
+            const videoFile = await downloadPexelsVideo(query, outputDir, index);
+            if (videoFile)
+                return { file: videoFile, kind: 'video', query };
+        }
+        catch { }
+        try {
+            const photoFile = await downloadPexelsPhoto(query, outputDir, index);
+            if (photoFile)
+                return { file: photoFile, kind: 'photo', query };
+        }
+        catch { }
+    }
+    return null;
 }

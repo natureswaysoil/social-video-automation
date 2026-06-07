@@ -27,6 +27,12 @@ const TEMP_DIR = path.resolve(ROOT, 'temp-commercial')
 const MANIFEST_DIR = path.resolve(ROOT, 'data/runs')
 const FOOTAGE_DIR = path.resolve(ROOT, process.env.FOOTAGE_DIR || 'footage')
 const DEFAULT_PUBLIC_VIDEO_BUCKET = 'natureswaysoil-social-videos'
+const PLATFORM_VARIANT_MAP: Record<string, string> = {
+  youtube_shorts: 'youtube',
+  instagram_reels: 'instagram',
+  facebook_reels: 'facebook',
+  tiktok: 'tiktok'
+}
 const SECRET_NAMES = [
   'OPENAI_API_KEY',
   'OPENAI_MODEL',
@@ -143,7 +149,15 @@ async function postToYouTube(videoFileOrUrl: string, title: string, description:
   const body = isHttpUrl(videoFileOrUrl)
     ? (await axios.get(videoFileOrUrl, { responseType: 'stream', timeout: 120000 })).data
     : fs.createReadStream(videoFileOrUrl)
-  const upload = await youtube.videos.insert({ part: ['snippet', 'status'], requestBody: { snippet: { title: title.slice(0, 95), description, categoryId: '22' }, status: { privacyStatus: (process.env.YT_PRIVACY_STATUS as any) || 'public' } }, media: { body } })
+  const requestBody = {
+    snippet: { title: title.slice(0, 95), description, categoryId: '22' },
+    status: { privacyStatus: (process.env.YT_PRIVACY_STATUS as any) || 'public' }
+  }
+  const upload = await youtube.videos.insert({
+    part: ['snippet', 'status'],
+    requestBody,
+    media: { body }
+  })
   const id = upload.data.id || ''
   if (!id) throw new Error('YouTube upload did not return video id')
   if (thumbnailFile && fs.existsSync(thumbnailFile)) {
@@ -217,6 +231,15 @@ function fallbackQueries(product: any) {
   if (/pasture|hay|acre|field/.test(text)) return ['green pasture field', 'spraying farm field', 'hay field grass', 'lush grass close up', 'farm pasture sunset']
   if (/compost|worm|biochar|soil revitalizer/.test(text)) return ['hands holding rich soil', 'raised bed garden soil', 'compost close up', 'vegetable garden raised bed', 'healthy plant roots']
   return ['lush green lawn', 'spraying lawn', 'healthy soil close up', 'garden watering plants', 'green grass close up']
+}
+
+function normalizedScenes(scenePlan: any, fallbackSceneQueries: string[]) {
+  if (Array.isArray(scenePlan?.scenes) && scenePlan.scenes.length) return scenePlan.scenes.slice(0, 5)
+  return fallbackSceneQueries.slice(0, 5).map((query: string, idx: number) => ({
+    name: `Scene ${idx + 1}`,
+    seconds: idx === 0 ? 3 : 5,
+    brollQuery: query
+  }))
 }
 
 function localFootageCandidates(product: any) {
@@ -328,11 +351,7 @@ async function uploadAutomatically(variants: any[], context: any) {
 
   const results = []
   for (const variant of variants) {
-    const target =
-      variant.platform === 'youtube_shorts' ? 'youtube' :
-      variant.platform === 'instagram_reels' ? 'instagram' :
-      variant.platform === 'facebook_reels' ? 'facebook' :
-      variant.platform === 'tiktok' ? 'tiktok' : variant.platform
+    const target = PLATFORM_VARIANT_MAP[variant.platform] || variant.platform
 
     if (!enabled.includes(target)) {
       results.push({ platform: variant.platform, skipped: true, reason: `Platform ${target} not enabled`, file: variant.file })
@@ -380,8 +399,15 @@ async function main() {
   const scenes = []
   const productImage = await downloadProductImage(product, TEMP_DIR)
   const fallbackSceneQueries = fallbackQueries(product)
+  const localScore = (file: string, text: string) => {
+    const fileName = path.basename(file).toLowerCase()
+    return text
+      .split(/\s+/)
+      .filter(Boolean)
+      .reduce((score: number, token: string) => score + (fileName.includes(token) ? 1 : 0), 0)
+  }
 
-  for (const [i, rawScene] of (scenePlan.scenes || fallbackSceneQueries.map((q: string, idx: number) => ({ name: `Scene ${idx + 1}`, seconds: idx === 0 ? 3 : 5, brollQuery: q }))).slice(0, 5).entries()) {
+  for (const [i, rawScene] of normalizedScenes(scenePlan, fallbackSceneQueries).entries()) {
     const scene = rawScene || {}
     const seconds = Number(scene.seconds || 5)
     if (scene.useProductImage && productImage) {
@@ -392,7 +418,7 @@ async function main() {
     const queryText = `${scene.name || ''} ${scene.caption || ''} ${scene.brollQuery || ''} ${(scene.brollQueries || []).join(' ')}`.toLowerCase()
     const localCandidate = local
       .filter((file) => !usedLocal.has(file))
-      .map((file) => ({ file, score: queryText.split(/\s+/).filter(Boolean).reduce((score: number, token: string) => score + (path.basename(file).toLowerCase().includes(token) ? 1 : 0), 0) }))
+      .map((file) => ({ file, score: localScore(file, queryText) }))
       .sort((a, b) => b.score - a.score)[0]
 
     if (localCandidate?.score > 0) {

@@ -82,6 +82,27 @@ async function checkPexels() {
   }
 }
 
+function checkScenePlanCoverage() {
+  const productsRaw = JSON.parse(fs.readFileSync(path.resolve(ROOT, 'config/top-products.json'), 'utf8'))
+  const creativeRaw = JSON.parse(fs.readFileSync(path.resolve(ROOT, 'config/creative-profiles.json'), 'utf8'))
+  const products = Array.isArray(productsRaw?.topProducts) ? productsRaw.topProducts : []
+  const profiles = creativeRaw?.profiles || {}
+  const details = products.map((product: any) => {
+    const profileScenes = Array.isArray(profiles?.[product.id]?.scenes) ? profiles[product.id].scenes.slice(0, 5) : []
+    const curated = profileScenes.map((scene: any, index: number) => buildSceneQueryPriority(scene, product, index))
+    const fallbackScenes = (Array.isArray(product?.brollQueries) && product.brollQueries.length
+      ? product.brollQueries.slice(0, 5).map((query: string) => ({ brollQuery: query }))
+      : [{ brollQuery: product.category || product.name || 'lawn soil' }])
+    const fallback = fallbackScenes.map((scene: any, index: number) => buildSceneQueryPriority(scene, product, index))
+    return { productId: product.id, curated, fallback }
+  })
+  const missing = details.filter((item: any) =>
+    (!item.curated.length || item.curated.some((queries: string[]) => !queries.length)) &&
+    item.fallback.some((queries: string[]) => !queries.length)
+  )
+  return { check: 'scene-plan-coverage', ok: missing.length === 0, detail: details }
+}
+
 async function main() {
   const dryRunLogOnly = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true'
   const provider = String(process.env.VIDEO_PROVIDER || 'openai_tts').toLowerCase()
@@ -101,27 +122,6 @@ async function main() {
     for (const secret of requiredSecrets) {
       const ok = await loadSecretIfPresent(secret)
       results.push({ check: `secret:${secret}`, ok })
-    }
-
-    function checkScenePlanCoverage() {
-      const productsRaw = JSON.parse(fs.readFileSync(path.resolve(ROOT, 'config/top-products.json'), 'utf8'))
-      const creativeRaw = JSON.parse(fs.readFileSync(path.resolve(ROOT, 'config/creative-profiles.json'), 'utf8'))
-      const products = Array.isArray(productsRaw?.topProducts) ? productsRaw.topProducts : []
-      const profiles = creativeRaw?.profiles || {}
-      const details = products.map((product: any) => {
-        const profileScenes = Array.isArray(profiles?.[product.id]?.scenes) ? profiles[product.id].scenes.slice(0, 5) : []
-        const curated = profileScenes.map((scene: any, index: number) => buildSceneQueryPriority(scene, product, index))
-        const fallbackScenes = (Array.isArray(product?.brollQueries) && product.brollQueries.length
-          ? product.brollQueries.slice(0, 5).map((query: string) => ({ brollQuery: query }))
-          : [{ brollQuery: product.category || product.name || 'lawn soil' }])
-        const fallback = fallbackScenes.map((scene: any, index: number) => buildSceneQueryPriority(scene, product, index))
-        return { productId: product.id, curated, fallback }
-      })
-      const missing = details.filter((item: any) =>
-        (!item.curated.length || item.curated.some((queries: string[]) => !queries.length)) &&
-        item.fallback.some((queries: string[]) => !queries.length)
-      )
-      return { check: 'scene-plan-coverage', ok: missing.length === 0, detail: details }
     }
 
     results.push(await checkPexels())
