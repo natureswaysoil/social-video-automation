@@ -68,12 +68,29 @@ function secretCandidates(name: string) {
   return [...new Set([name, upper, upper.toLowerCase(), upper.toLowerCase().replace(/_/g, '-')])]
 }
 
+function isNotFoundSecretError(error: any): boolean {
+  return Number(error?.code) === 5 || String(error?.message || '').toUpperCase().includes('NOT_FOUND')
+}
+
+function isPermissionDeniedSecretError(error: any): boolean {
+  const message = String(error?.message || '').toUpperCase()
+  return Number(error?.code) === 7 || message.includes('PERMISSION_DENIED') || message.includes('PERMISSION DENIED')
+}
+
 async function loadSecrets() {
-  if (String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() === 'false') return
+  const useSecretManager = String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() !== 'false'
+  if (!useSecretManager) return
+  const enforceSecretManagerAccess = String(process.env.REQUIRE_SECRET_MANAGER_ACCESS || process.env.CI || '').toLowerCase() === 'true'
+  const dryRun = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true'
+  const hasAdc = !!process.env.GOOGLE_APPLICATION_CREDENTIALS || !!process.env.GOOGLE_GHA_CREDS_PATH
+  if (dryRun && !hasAdc) {
+    console.log('Secret Manager lookup skipped for local dry run without ADC credentials')
+    return
+  }
   const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'natureswaysoil-video'
   const client = new SecretManagerServiceClient()
   for (const name of SECRET_NAMES) {
-    if (hasValue(name)) continue
+    if (hasValue(name) && !enforceSecretManagerAccess) continue
     for (const candidate of secretCandidates(name)) {
       try {
         const [version] = await client.accessSecretVersion({ name: `projects/${projectId}/secrets/${candidate}/versions/latest` })
@@ -85,7 +102,11 @@ async function loadSecrets() {
           break
         }
       } catch (error: any) {
-        if (Number(error?.code) === 5 || String(error?.message || '').includes('NOT_FOUND')) continue
+        if (isNotFoundSecretError(error)) continue
+        if (isPermissionDeniedSecretError(error)) {
+          throw new Error(`Secret Manager permission denied for ${candidate}: ${error?.message || error}`)
+        }
+        console.log(`Could not load secret ${candidate}: ${error?.message || error}`)
         break
       }
     }

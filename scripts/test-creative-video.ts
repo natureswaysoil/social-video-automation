@@ -24,24 +24,42 @@ function log(message: string, data?: any) { data === undefined ? console.log(mes
 function json(file: string, fallback: any) { try { return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : fallback } catch { return fallback } }
 function good(value?: string) { return !!value && !/your_|your-|changeme|placeholder|paste_|replace_/i.test(value) }
 function variants(name: string) { const upper = name.replace(/[\s-]+/g, '_').toUpperCase(); return [...new Set([upper, upper.toLowerCase().replace(/_/g, '-'), upper.toLowerCase(), name])] }
+function isNotFoundSecretError(error: any): boolean { return Number(error?.code) === 5 || String(error?.message || '').toUpperCase().includes('NOT_FOUND') }
+function isPermissionDeniedSecretError(error: any): boolean {
+  const message = String(error?.message || '').toUpperCase()
+  return Number(error?.code) === 7 || message.includes('PERMISSION_DENIED') || message.includes('PERMISSION DENIED')
+}
 
 async function loadSecrets() {
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT || 'natureswaysoil-video'
+  const useSecretManager = String(process.env.USE_SECRET_MANAGER || 'true').toLowerCase() !== 'false'
+  if (!useSecretManager) return
+  const enforceSecretManagerAccess = String(process.env.REQUIRE_SECRET_MANAGER_ACCESS || process.env.CI || '').toLowerCase() === 'true'
+  const dryRun = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true'
+  const hasAdc = !!process.env.GOOGLE_APPLICATION_CREDENTIALS || !!process.env.GOOGLE_GHA_CREDS_PATH
+  if (dryRun && !hasAdc) {
+    log('Secret Manager lookup skipped for local dry run without ADC credentials')
+    return
+  }
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'natureswaysoil-video'
   const client = new SecretManagerServiceClient()
   for (const name of SECRET_NAMES) {
-    if (good(process.env[name])) continue
+    if (good(process.env[name]) && !enforceSecretManagerAccess) continue
     for (const candidate of variants(name)) {
       try {
         const [version] = await client.accessSecretVersion({ name: `projects/${projectId}/secrets/${candidate}/versions/latest` })
         const value = version.payload?.data?.toString().trim()
         if (value) {
           process.env[name] = value
+          process.env[candidate] = value
           if (candidate === 'DiD') process.env.DID_API_KEY = value
           log(`Loaded secret: ${candidate}`)
           break
         }
       } catch (error: any) {
-        if (Number(error?.code) === 5) continue
+        if (isNotFoundSecretError(error)) continue
+        if (isPermissionDeniedSecretError(error)) {
+          throw new Error(`Secret Manager permission denied for ${candidate}: ${error?.message || error}`)
+        }
         log(`Could not load ${candidate}`, error?.message || error)
         break
       }
