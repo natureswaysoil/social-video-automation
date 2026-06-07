@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
+import { buildSceneQueryPriority } from './lib/pexels-media'
 
 const ROOT = process.cwd()
 const REQUIRED_FILES = [
@@ -81,18 +82,39 @@ async function checkPexels() {
   }
 }
 
+function checkScenePlanCoverage() {
+  const productsRaw = JSON.parse(fs.readFileSync(path.resolve(ROOT, 'config/top-products.json'), 'utf8'))
+  const creativeRaw = JSON.parse(fs.readFileSync(path.resolve(ROOT, 'config/creative-profiles.json'), 'utf8'))
+  const products = Array.isArray(productsRaw?.topProducts) ? productsRaw.topProducts : []
+  const profiles = creativeRaw?.profiles || {}
+  const details = products.map((product: any) => {
+    const profileScenes = Array.isArray(profiles?.[product.id]?.scenes) ? profiles[product.id].scenes.slice(0, 5) : []
+    const curated = profileScenes.map((scene: any, index: number) => buildSceneQueryPriority(scene, product, index))
+    const fallbackScenes = (Array.isArray(product?.brollQueries) && product.brollQueries.length
+      ? product.brollQueries.slice(0, 5).map((query: string) => ({ brollQuery: query }))
+      : [{ brollQuery: product.category || product.name || 'lawn soil' }])
+    const fallback = fallbackScenes.map((scene: any, index: number) => buildSceneQueryPriority(scene, product, index))
+    return { productId: product.id, curated, fallback }
+  })
+  const missing = details.filter((item: any) =>
+    (!item.curated.length || item.curated.some((queries: string[]) => !queries.length)) &&
+    item.fallback.some((queries: string[]) => !queries.length)
+  )
+  return { check: 'scene-plan-coverage', ok: missing.length === 0, detail: details }
+}
+
 async function main() {
   const dryRunLogOnly = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true'
-  const provider = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase()
+  const provider = String(process.env.VIDEO_PROVIDER || 'openai_tts').toLowerCase()
   const platforms = String(process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map(x => x.trim()).filter(Boolean)
 
   const requiredSecrets = ['OPENAI_API_KEY', 'PEXELS_API_KEY']
-  if (provider === 'did') requiredSecrets.push('DID_API_KEY')
   if (platforms.includes('youtube')) requiredSecrets.push('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REFRESH_TOKEN')
   if (platforms.includes('instagram')) requiredSecrets.push('INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_IG_ID')
 
   const results: any[] = []
   results.push(...checkFiles())
+  results.push(checkScenePlanCoverage())
 
   if (dryRunLogOnly) {
     results.push({ check: 'dry-run', ok: true, detail: 'Skipping secret and API validation checks (DRY_RUN_LOG_ONLY=true)' })

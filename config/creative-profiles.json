@@ -105,6 +105,56 @@
         }
       ]
     },
+    "NWS_025": {
+      "audience": "dog owners with outdoor turf, patio, kennel, and yard odor spots",
+      "angle": "outdoor pet odor removal with practical application visuals and clear CTA",
+      "tone": "friendly, practical, no hype, no overpromising",
+      "cta": "See full product details at natureswaysoil.com.",
+      "hooks": [
+        "Outdoor pet odors need more than a quick fragrance cover-up.",
+        "If your dog area smells even after rinsing, treat the source.",
+        "Keep patios, turf, and pet zones fresher with a pet-safe routine."
+      ],
+      "scenes": [
+        {
+          "name": "Outdoor odor problem",
+          "seconds": 5,
+          "voiceover": "If your backyard, patio, or kennel keeps smelling like pet urine, the odor source is still there.",
+          "brollQueries": ["dog running on backyard lawn", "outdoor kennel dog area", "dog on patio"],
+          "caption": "OUTDOOR PET ODOR?"
+        },
+        {
+          "name": "Product intro",
+          "seconds": 5,
+          "voiceover": "Nature's Way Soil Dog Urine Odor Eliminator is made for outdoor surfaces and pet zones.",
+          "brollQueries": ["pet deodorizer spray bottle lawn", "dog yard cleaning spray", "outdoor pet odor eliminator"],
+          "caption": "DOG URINE ODOR ELIMINATOR",
+          "useProductImage": true
+        },
+        {
+          "name": "Apply to surfaces",
+          "seconds": 6,
+          "voiceover": "Spray grass, concrete, patios, kennel runs, or artificial turf as directed on the label.",
+          "brollQueries": ["spraying concrete patio with garden sprayer", "spraying artificial turf pet area", "cleaning outdoor kennel floor"],
+          "caption": "SPRAY WHERE ODORS START"
+        },
+        {
+          "name": "Everyday pet spaces",
+          "seconds": 6,
+          "voiceover": "Use it as part of regular outdoor pet-area maintenance instead of masking smells.",
+          "brollQueries": ["clean backyard with dog", "pet owner rinsing patio", "dog yard maintenance"],
+          "caption": "PET-SAFE OUTDOOR ROUTINE"
+        },
+        {
+          "name": "CTA",
+          "seconds": 6,
+          "voiceover": "For full directions and product details, visit natureswaysoil.com.",
+          "brollQueries": ["dog relaxing on clean patio", "fresh backyard lawn with dog", "outdoor pet area sunset"],
+          "caption": "LEARN MORE AT NATURESWAYSOIL.COM",
+          "useProductImage": true
+        }
+      ]
+    },
     "NWS_014": {
       "audience": "dog owners with yellow lawn spots, pet areas, kennels, patios, and turf runs",
       "angle": "soil-first lawn recovery instead of green dye or cover-up",

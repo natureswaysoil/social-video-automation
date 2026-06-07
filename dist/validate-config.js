@@ -9,6 +9,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const axios_1 = __importDefault(require("axios"));
 const secret_manager_1 = require("@google-cloud/secret-manager");
+const pexels_media_1 = require("./lib/pexels-media");
 const ROOT = process.cwd();
 const REQUIRED_FILES = [
     'config/top-products.json',
@@ -88,19 +89,36 @@ async function checkPexels() {
         return { check: 'pexels', ok: false, detail: error?.response?.data || error.message };
     }
 }
+function checkScenePlanCoverage() {
+    const productsRaw = JSON.parse(fs_1.default.readFileSync(path_1.default.resolve(ROOT, 'config/top-products.json'), 'utf8'));
+    const creativeRaw = JSON.parse(fs_1.default.readFileSync(path_1.default.resolve(ROOT, 'config/creative-profiles.json'), 'utf8'));
+    const products = Array.isArray(productsRaw?.topProducts) ? productsRaw.topProducts : [];
+    const profiles = creativeRaw?.profiles || {};
+    const details = products.map((product) => {
+        const profileScenes = Array.isArray(profiles?.[product.id]?.scenes) ? profiles[product.id].scenes.slice(0, 5) : [];
+        const curated = profileScenes.map((scene, index) => (0, pexels_media_1.buildSceneQueryPriority)(scene, product, index));
+        const fallbackScenes = (Array.isArray(product?.brollQueries) && product.brollQueries.length
+            ? product.brollQueries.slice(0, 5).map((query) => ({ brollQuery: query }))
+            : [{ brollQuery: product.category || product.name || 'lawn soil' }]);
+        const fallback = fallbackScenes.map((scene, index) => (0, pexels_media_1.buildSceneQueryPriority)(scene, product, index));
+        return { productId: product.id, curated, fallback };
+    });
+    const missing = details.filter((item) => (!item.curated.length || item.curated.some((queries) => !queries.length)) &&
+        item.fallback.some((queries) => !queries.length));
+    return { check: 'scene-plan-coverage', ok: missing.length === 0, detail: details };
+}
 async function main() {
     const dryRunLogOnly = String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true';
-    const provider = String(process.env.VIDEO_PROVIDER || 'did').toLowerCase();
+    const provider = String(process.env.VIDEO_PROVIDER || 'openai_tts').toLowerCase();
     const platforms = String(process.env.ENABLE_PLATFORMS || 'youtube,instagram').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
     const requiredSecrets = ['OPENAI_API_KEY', 'PEXELS_API_KEY'];
-    if (provider === 'did')
-        requiredSecrets.push('DID_API_KEY');
     if (platforms.includes('youtube'))
         requiredSecrets.push('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REFRESH_TOKEN');
     if (platforms.includes('instagram'))
         requiredSecrets.push('INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_IG_ID');
     const results = [];
     results.push(...checkFiles());
+    results.push(checkScenePlanCoverage());
     if (dryRunLogOnly) {
         results.push({ check: 'dry-run', ok: true, detail: 'Skipping secret and API validation checks (DRY_RUN_LOG_ONLY=true)' });
     }
