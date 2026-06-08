@@ -21,10 +21,9 @@ jobs:
         run: npm run validate:dry
         env:
           DRY_RUN_LOG_ONLY: true
-          VIDEO_PROVIDER: heygen
+          VIDEO_PROVIDER: openai_tts
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
 
   generate-and-post:
     needs: validate
@@ -46,13 +45,12 @@ jobs:
       RUN_POSTING: 'true'
       ALLOW_DIRECT_SECRETS_FALLBACK: 'false'
 
-      VIDEO_PROVIDER: heygen
+      VIDEO_PROVIDER: openai_tts
       ENABLE_PLATFORMS: youtube,instagram
-      CI_MANDATORY_PLATFORMS: all
+      CI_MANDATORY_PLATFORMS: enabled
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: gpt-4o-mini
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}

@@ -19,6 +19,7 @@ export async function postToTikTok(videoUrl: string, caption: string) {
   if (!/^https?:\/\//i.test(videoUrl)) throw new Error('TikTok posting requires a public HTTPS video URL')
 
   const host = process.env.TIKTOK_API_HOST || 'open.tiktokapis.com'
+  // For PULL_FROM_URL, TikTok fetches the video itself after init; no separate upload call is needed.
   const init = await axios.post(`https://${host}/v2/post/publish/video/init/`, {
     post_info: { title: caption.slice(0, 2200), privacy_level: 'PUBLIC_TO_EVERYONE', disable_duet: false, disable_comment: false, disable_stitch: false },
     source_info: { source: 'PULL_FROM_URL', video_url: videoUrl }
@@ -27,15 +28,10 @@ export async function postToTikTok(videoUrl: string, caption: string) {
   const publishId = init.data?.data?.publish_id || init.data?.publish_id || ''
   if (!publishId) throw new Error(`TikTok init failed: ${JSON.stringify(init.data)}`)
 
-  const upload = await axios.post(`https://${host}/v2/post/publish/video/upload/`, {
-    open_id: openId,
-    publish_id: publishId
-  }, { headers: { Authorization: 'Bearer ' + accessToken }, timeout: 120000 })
-
   return {
     platform: 'tiktok',
     publishId,
-    status: upload.data?.data?.status || upload.data?.status || 'submitted'
+    status: init.data?.data?.status || init.data?.status || 'submitted'
   }
 }
 

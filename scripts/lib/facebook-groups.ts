@@ -45,6 +45,14 @@ export async function postToFacebookGroups(product: any, publicVideoUrl: string,
   const config = readJson(GROUPS_CONFIG, { allowedGroupIds: [], routes: [] })
   const allowed = new Set((config.allowedGroupIds || []).map((id: string) => String(id)))
   const topics = inferTopics(product)
+
+  // Warn about any routes configured with groupHandle but no groupId (Graph API requires a numeric ID)
+  for (const route of (config.routes || [])) {
+    if (!route.groupId && route.groupHandle) {
+      console.log(`Facebook group route "${route.label || route.groupHandle}" has groupHandle but no groupId. The Facebook Graph API requires a numeric group ID to post videos. This group will be skipped until a groupId is added to config/facebook-groups.json.`)
+    }
+  }
+
   const routes = (config.routes || []).filter((route: any) => {
     const routeTopics = Array.isArray(route.topics) ? route.topics : []
     const groupId = String(route.groupId || '')

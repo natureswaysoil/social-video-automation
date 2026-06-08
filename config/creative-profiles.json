@@ -166,10 +166,10 @@
         "For pet lawns, the best fix starts below the grass blade."
       ],
       "scenes": [
-        { "name": "problem", "seconds": 7, "brollQueries": ["dog walking on green lawn", "yellow grass patches lawn", "dog backyard lawn"] },
-        { "name": "soil cause", "seconds": 8, "brollQueries": ["close up grass roots soil", "dry yellow grass close up", "healthy soil close up"] },
-        { "name": "apply", "seconds": 8, "brollQueries": ["garden hose watering lawn", "spraying lawn with hose", "watering backyard grass"] },
-        { "name": "result and CTA", "seconds": 7, "brollQueries": ["lush green backyard lawn", "healthy green grass close up", "dog on green lawn"] }
+        { "name": "problem", "seconds": 7, "voiceover": "If your dog keeps leaving yellow spots on the lawn, the grass and soil need support, not just a quick rinse.", "brollQueries": ["dog walking on green lawn", "yellow grass patches lawn", "dog backyard lawn"] },
+        { "name": "soil cause", "seconds": 8, "voiceover": "Dog urine changes the salt balance and pH of the soil, stressing the grass at root level — not just the surface.", "brollQueries": ["close up grass roots soil", "dry yellow grass close up", "healthy soil close up"] },
+        { "name": "apply", "seconds": 8, "voiceover": "Apply Nature's Way Soil Dog Urine Neutralizer to the affected areas with a garden hose sprayer as part of your regular lawn care.", "brollQueries": ["garden hose watering lawn", "spraying lawn with hose", "watering backyard grass"] },
+        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["lush green backyard lawn", "healthy green grass close up", "dog on green lawn"] }
       ]
     },
     "NWS_011": {
@@ -183,10 +183,10 @@
         "Better plant growth starts with better soil movement."
       ],
       "scenes": [
-        { "name": "problem", "seconds": 7, "brollQueries": ["weak garden plants", "dry garden soil close up", "stressed vegetable garden"] },
-        { "name": "root zone", "seconds": 8, "brollQueries": ["plant roots in soil", "healthy white roots close up", "rich soil close up"] },
-        { "name": "ingredients", "seconds": 8, "brollQueries": ["kelp extract lawn treatment", "liquid kelp fertilizer mixing", "liquid fertilizer pouring"] },
-        { "name": "result and CTA", "seconds": 7, "brollQueries": ["healthy vegetable garden", "lush garden plants", "green lawn close up"] }
+        { "name": "problem", "seconds": 7, "voiceover": "If your plants look stuck or the lawn seems fed but still thin, the soil may not be moving nutrients effectively.", "brollQueries": ["weak garden plants", "dry garden soil close up", "stressed vegetable garden"] },
+        { "name": "root zone", "seconds": 8, "voiceover": "Humic and fulvic acids help support the root zone and nutrient movement in the soil at the microbial level.", "brollQueries": ["plant roots in soil", "healthy white roots close up", "rich soil close up"] },
+        { "name": "ingredients", "seconds": 8, "voiceover": "Combined with organic kelp, this liquid concentrate supports soil conditioning and root-zone activity.", "brollQueries": ["kelp extract lawn treatment", "liquid kelp fertilizer mixing", "liquid fertilizer pouring"] },
+        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["healthy vegetable garden", "lush garden plants", "green lawn close up"] }
       ]
     },
     "NWS_013": {
@@ -200,10 +200,10 @@
         "For raised beds and containers, a little biology can go a long way."
       ],
       "scenes": [
-        { "name": "problem", "seconds": 7, "brollQueries": ["raised bed garden soil", "container garden soil", "dry potting soil close up"] },
-        { "name": "ingredients", "seconds": 8, "brollQueries": ["worm castings compost", "biochar soil close up", "hands holding compost"] },
-        { "name": "use", "seconds": 8, "brollQueries": ["mixing compost into raised bed", "gardener adding soil to plants", "planting vegetable starts"] },
-        { "name": "result and CTA", "seconds": 7, "brollQueries": ["healthy raised bed vegetables", "lush vegetable garden", "hands holding healthy soil"] }
+        { "name": "problem", "seconds": 7, "voiceover": "If your raised beds or containers look tired after a growing season, the soil biology may need a reset.", "brollQueries": ["raised bed garden soil", "container garden soil", "dry potting soil close up"] },
+        { "name": "ingredients", "seconds": 8, "voiceover": "Nature's Way Soil Enhanced Living Compost blends worm castings, activated biochar, and fermented duckweed extract for soil-first support.", "brollQueries": ["worm castings compost", "biochar soil close up", "hands holding compost"] },
+        { "name": "use", "seconds": 8, "voiceover": "Top-dress or mix into raised beds and containers as part of your regular soil care routine according to label directions.", "brollQueries": ["mixing compost into raised bed", "gardener adding soil to plants", "planting vegetable starts"] },
+        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["healthy raised bed vegetables", "lush vegetable garden", "hands holding healthy soil"] }
       ]
     },
     "NWS_021": {
@@ -217,10 +217,10 @@
         "For hay, pasture, and lawn, stronger grass starts in the root zone."
       ],
       "scenes": [
-        { "name": "field problem", "seconds": 7, "brollQueries": ["dry pasture grass field", "thin pasture grass", "farm pasture field"] },
-        { "name": "use case", "seconds": 8, "brollQueries": ["green pasture grass field", "hay bales farm field", "cattle grazing pasture"] },
-        { "name": "application", "seconds": 8, "brollQueries": ["spraying pasture field", "tractor spraying field", "farm field grass close up"] },
-        { "name": "result and CTA", "seconds": 7, "brollQueries": ["lush pasture grass", "green hay field", "horse grazing pasture"] }
+        { "name": "field problem", "seconds": 7, "voiceover": "If your pasture or hay field looks thin and tired, the problem usually starts in the soil under the grass stand.", "brollQueries": ["dry pasture grass field", "thin pasture grass", "farm pasture field"] },
+        { "name": "use case", "seconds": 8, "voiceover": "Nature's Way Soil Hay, Pasture and Lawn Fertilizer is a liquid support program built for large grass areas, hay ground, and pasture.", "brollQueries": ["green pasture grass field", "hay bales farm field", "cattle grazing pasture"] },
+        { "name": "application", "seconds": 8, "voiceover": "Apply with a boom sprayer, hose-end applicator, or injection system as directed on the label for your acreage.", "brollQueries": ["spraying pasture field", "tractor spraying field", "farm field grass close up"] },
+        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["lush pasture grass", "green hay field", "horse grazing pasture"] }
       ]
     },
     "NWS_018": {
@@ -234,10 +234,10 @@
         "If your lawn looks hungry, the soil may need help moving nutrients."
       ],
       "scenes": [
-        { "name": "lawn problem", "seconds": 7, "brollQueries": ["patchy lawn close up", "dry lawn grass close up", "home lawn problem"] },
-        { "name": "ingredients", "seconds": 8, "brollQueries": ["seaweed extract lawn treatment", "liquid kelp fertilizer bottle", "humic acid soil close up"] },
-        { "name": "application", "seconds": 8, "brollQueries": ["watering green lawn", "spraying lawn with hose", "lawn care application"] },
-        { "name": "result and CTA", "seconds": 7, "brollQueries": ["lush green lawn close up", "healthy lawn sunset", "green grass roots close up"] }
+        { "name": "lawn problem", "seconds": 7, "voiceover": "If your lawn looks patchy or is not responding to regular fertilizer, the root zone may not be moving nutrients effectively.", "brollQueries": ["patchy lawn close up", "dry lawn grass close up", "home lawn problem"] },
+        { "name": "ingredients", "seconds": 8, "voiceover": "Nature's Way Soil Seaweed and Humic Acid Lawn Treatment combines organic seaweed extract and humic acid to support the root zone and nutrient availability.", "brollQueries": ["seaweed extract lawn treatment", "liquid kelp fertilizer bottle", "humic acid soil close up"] },
+        { "name": "application", "seconds": 8, "voiceover": "Apply with a hose-end sprayer or diluted watering can as directed on the label for your lawn size.", "brollQueries": ["watering green lawn", "spraying lawn with hose", "lawn care application"] },
+        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["lush green lawn close up", "healthy lawn sunset", "green grass roots close up"] }
       ]
     }
   }

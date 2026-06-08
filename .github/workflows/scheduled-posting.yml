@@ -31,11 +31,10 @@ jobs:
       DEFAULT_GOOGLE_CLOUD_PROJECT: natureswaysoil-video
       GOOGLE_CLOUD_PROJECT: natureswaysoil-video
 
-      SEED_PRODUCT_LIMIT: '5'
+      SEED_PRODUCT_LIMIT: '20'
       VARIATIONS_PER_PRODUCT: '5'
-      NEXT_PRODUCT_PREFERRED_ID: NWS_021
       ENABLE_PLATFORMS: youtube,instagram,facebook
-      CI_MANDATORY_PLATFORMS: all
+      CI_MANDATORY_PLATFORMS: enabled
       YT_PRIVACY_STATUS: public
       DRY_RUN_LOG_ONLY: 'false'
       ROTATION_STATE_FILE: data/rotation-state.json
