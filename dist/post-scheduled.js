@@ -301,9 +301,10 @@ function isHttpUrl(value) {
     return /^https?:\/\//i.test(String(value || ''));
 }
 function isCiMandatoryPlatformMode() {
-    if (String(process.env.CI_MANDATORY_PLATFORMS || '').toLowerCase() === 'all')
-        return true;
-    if (String(process.env.CI_MANDATORY_PLATFORMS || '').toLowerCase() === 'enabled')
+    const setting = String(process.env.CI_MANDATORY_PLATFORMS || '').toLowerCase();
+    if (setting === 'false' || setting === 'none' || setting === 'off')
+        return false;
+    if (setting === 'all' || setting === 'enabled')
         return true;
     return String(process.env.CI || '').toLowerCase() === 'true';
 }
