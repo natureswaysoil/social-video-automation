@@ -247,8 +247,20 @@ jobs:
         run: npm install
 
       - name: Run scheduled video post
+        id: scheduled_post
         if: env.RUN_POSTING == 'true'
+        continue-on-error: true
         run: npm run post:scheduled
+
+      - name: Fallback YouTube-only post if full social run fails
+        if: env.RUN_POSTING == 'true' && steps.scheduled_post.outcome == 'failure'
+        env:
+          ENABLE_PLATFORMS: youtube
+          CI_MANDATORY_PLATFORMS: 'false'
+          ROTATION_STATE_PERSIST_TO_GCS: 'false'
+        run: |
+          echo "::warning::Full multi-platform post failed. Retrying YouTube-only so the scheduled post still publishes when public URL/GCS/social API posting is the blocker."
+          npm run post:scheduled
 
       - name: Optional analytics backfill (after 24h)
         if: env.RUN_POSTING == 'true' && env.RUN_ANALYTICS_BACKFILL == 'true'
