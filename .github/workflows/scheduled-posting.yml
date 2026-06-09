@@ -33,8 +33,10 @@ jobs:
 
       SEED_PRODUCT_LIMIT: '20'
       VARIATIONS_PER_PRODUCT: '5'
-      ENABLE_PLATFORMS: youtube,instagram,facebook
-      CI_MANDATORY_PLATFORMS: enabled
+      # Include facebook_groups so the scheduled run actually executes scripts/lib/facebook-groups.ts.
+      ENABLE_PLATFORMS: youtube,instagram,facebook,facebook_groups
+      # Production-friendly mode: let working platforms post even if one platform/token fails.
+      CI_MANDATORY_PLATFORMS: 'false'
       YT_PRIVACY_STATUS: public
       DRY_RUN_LOG_ONLY: 'false'
       ROTATION_STATE_FILE: data/rotation-state.json
@@ -168,6 +170,8 @@ jobs:
             echo "- Secret Manager enabled: ${USE_SECRET_MANAGER:-false}"
             echo "- Public video bucket: ${GCS_PUBLIC_BUCKET:-unset}"
             echo "- Public video URL base: ${VIDEO_PUBLIC_URL_BASE:-unset}"
+            echo "- Enabled platforms: ${ENABLE_PLATFORMS:-unset}"
+            echo "- Mandatory platform mode: ${CI_MANDATORY_PLATFORMS:-unset}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate direct GitHub secrets fallback
