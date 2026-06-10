@@ -1,4 +1,3 @@
-// @ts-nocheck
 import axios from 'axios'
 import fs from 'fs'
 import path from 'path'
@@ -39,7 +38,9 @@ export function buildSceneQueryPriority(scene: any, product: any, index = 0) {
  * as a last resort. Previously the chain degraded straight to "green lawn",
  * which is the main reason b-roll looked generic and unrelated to the product.
  */
-function videoAttempts(query: string) {
+interface PexelsAttempt { query: string; orientation: string }
+
+function videoAttempts(query: string): PexelsAttempt[] {
   const q = String(query || '').trim()
   const short = trimQuery(q, 3)
   return [
@@ -47,7 +48,7 @@ function videoAttempts(query: string) {
     { query: q, orientation: 'landscape' },
     short !== q ? { query: short, orientation: 'portrait' } : null,
     short !== q ? { query: short, orientation: 'landscape' } : null
-  ].filter(Boolean)
+  ].filter((a): a is PexelsAttempt => a !== null)
 }
 
 // ---------------------------------------------------------------------------
@@ -139,10 +140,10 @@ export async function findPexelsPhotoUrl(query: string) {
 export async function downloadUrl(url: string, outputFile: string) {
   ensureDir(path.dirname(outputFile))
   const response = await axios.get(url, { responseType: 'stream', timeout: 120000 })
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const writer = fs.createWriteStream(outputFile)
     response.data.pipe(writer)
-    writer.on('finish', resolve)
+    writer.on('finish', () => resolve())
     writer.on('error', reject)
   })
   return outputFile
@@ -163,7 +164,9 @@ export async function downloadPexelsPhoto(query: string, outputDir: string, inde
   return await downloadUrl(url, file)
 }
 
-export async function fetchBrollForScene(scene: any, product: any, outputDir: string, index = 0) {
+export interface BrollResult { file: string; kind: 'video' | 'photo'; query: string }
+
+export async function fetchBrollForScene(scene: any, product: any, outputDir: string, index = 0): Promise<BrollResult | null> {
   const attempts = buildSceneQueryPriority(scene, product, index)
   for (const query of attempts) {
     try {

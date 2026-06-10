@@ -1,15 +1,14 @@
-// @ts-nocheck
 import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
 import OpenAI from 'openai'
-import { execSync } from 'child_process'
+import { runFfmpeg } from './lib/ffmpeg'
 import { google } from 'googleapis'
 import { Storage } from '@google-cloud/storage'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import { fetchBrollForScene } from './lib/pexels-media'
-import { composeVerticalAd } from './lib/ffmpeg-compositor'
+import { composeVerticalAd, CompositorScene } from './lib/ffmpeg-compositor'
 import { downloadProductImage, productOverlayText } from './lib/product-assets'
 import { chooseBestHook } from './lib/retention-engine'
 import { buildThumbnailPrompt } from './lib/ffmpeg-builder'
@@ -313,7 +312,7 @@ async function makeThumbnail(videoFile: string, product: any, hook: string) {
       console.log('DALL-E thumbnail generation failed; using frame extract fallback', { error: error?.message || error })
     }
   }
-  execSync(`ffmpeg -y -loglevel error -i "${videoFile}" -ss 00:00:02 -vframes 1 "${thumbnail}"`, { stdio: 'inherit' })
+  runFfmpeg(['-y', '-loglevel', 'error', '-i', videoFile, '-ss', '00:00:02', '-vframes', '1', thumbnail])
   return thumbnail
 }
 
@@ -327,7 +326,7 @@ function exportPlatformVariants(masterFile: string, product: any) {
   ]
   for (const spec of specs) {
     const out = path.resolve(OUTPUT_DIR, `${safeFileName(product.name)}-${spec.suffix}.mp4`)
-    execSync(`ffmpeg -y -i "${masterFile}" -t ${spec.maxSeconds} -c copy "${out}"`, { stdio: 'inherit' })
+    runFfmpeg(['-y', '-i', masterFile, '-t', String(spec.maxSeconds), '-c', 'copy', out])
     variants.push({ ...spec, file: out })
   }
   return variants
@@ -396,7 +395,7 @@ async function main() {
   const scenePlan = await generateScenePlan(product, profile, bestHook.hook)
   const local = localFootageCandidates(product)
   const usedLocal = new Set<string>()
-  const scenes = []
+  const scenes: CompositorScene[] = []
   const productImage = await downloadProductImage(product, TEMP_DIR)
   const fallbackSceneQueries = fallbackQueries(product)
   const localScore = (file: string, text: string) => {

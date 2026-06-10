@@ -1,4 +1,3 @@
-// @ts-nocheck
 import axios from 'axios'
 import fs from 'fs'
 import path from 'path'
@@ -62,10 +61,10 @@ export async function downloadProductImage(product: any, outputDir: string) {
 
   try {
     const response = await axios.get(url, { responseType: 'stream', timeout: 60000 })
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const writer = fs.createWriteStream(output)
       response.data.pipe(writer)
-      writer.on('finish', resolve)
+      writer.on('finish', () => resolve())
       writer.on('error', reject)
     })
     return output

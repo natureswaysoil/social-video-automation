@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 export function scoreHook(text: string) {
   const t = String(text || '').toLowerCase()
