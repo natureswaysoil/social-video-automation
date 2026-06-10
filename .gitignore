@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+.cache/
+.next/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.local
+*-service-account.json
+gcp-service-account.json
+
+# Generated media & working dirs
+output/
+temp/
+temp-scheduled/
+temp-commercial/
+footage/
+assets/products/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.srt
+
+# Runtime state (regenerated each run / persisted to GCS)
+data/rotation-state.json
+data/video-analytics.json
+data/facebook-posts-log.json
+data/runs/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+coverage/
+
+# Archives
+*.zip
+*.tar
+*.gz

@@ -9,8 +9,8 @@ This repo is separate from `natureswaysoil/video` so daily posting does not conf
 - Rotates through the top 5 Nature's Way Soil products
 - Generates a fresh 25-35 second script with OpenAI
 - Pulls portrait B-roll from Pexels when available
-- Creates a vertical b-roll video with optional D-ID narration
-- Polls until D-ID narration media is ready when narration is enabled
+- Creates a vertical b-roll video with OpenAI text-to-speech (TTS) narration
+- Renders narration locally with FFmpeg (no avatar provider polling required)
 - Posts to YouTube and Instagram when credentials are configured
 - Runs 5 scheduled slots per day through GitHub Actions
 
@@ -105,9 +105,12 @@ Minimum required:
 
 ```text
 OPENAI_API_KEY
-HEYGEN_API_KEY
 PEXELS_API_KEY
 ```
+
+Narration uses OpenAI text-to-speech (TTS); no separate avatar/voice
+provider key is required. The TTS model/voice can be tuned with the optional
+`TTS_MODEL` and `TTS_VOICE` variables (see Controls below).
 
 For YouTube posting:
 
@@ -149,9 +152,18 @@ VARIATIONS_PER_PRODUCT=5
 ENABLE_PLATFORMS=youtube,instagram
 YT_PRIVACY_STATUS=public
 DRY_RUN_LOG_ONLY=false
-HEYGEN_AVATAR_SCALE=0.52
-HEYGEN_AVATAR_OFFSET_Y=0.12
+
+# Narration provider is enforced to OpenAI TTS regardless of VIDEO_PROVIDER.
+VIDEO_PROVIDER=openai_tts
+TTS_MODEL=gpt-4o-mini-tts
+TTS_VOICE=alloy
+ENABLE_NARRATOR=true
 ```
+
+> Note: OpenAI TTS is the active narration provider. The legacy D-ID / HeyGen
+> avatar integrations are dormant and are not used by the posting pipeline.
+> Setting `VIDEO_PROVIDER` to anything other than `openai_tts` logs a notice
+> and still falls back to OpenAI TTS.
 
 ## Important
 

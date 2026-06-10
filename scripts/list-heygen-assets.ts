@@ -1,4 +1,3 @@
-// @ts-nocheck
 import 'dotenv/config'
 import axios from 'axios'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'

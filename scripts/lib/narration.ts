@@ -1,9 +1,8 @@
-// @ts-nocheck
 import fs from 'fs'
 import path from 'path'
 import OpenAI from 'openai'
-import { execSync } from 'child_process'
 import { ensureDir, safeFileName } from './video-utils'
+import { runFfmpeg } from './ffmpeg'
 
 /**
  * Generate a voiceover audio file using OpenAI TTS only.
@@ -36,13 +35,13 @@ export async function generateVoiceover(product: any, scenePlan: any, profile: a
     const buffer = Buffer.from(await response.arrayBuffer())
     fs.writeFileSync(ttsMp3, buffer)
 
-    execSync([
-      'ffmpeg -y -loglevel error',
-      `-i "${ttsMp3}"`,
-      '-af "loudnorm=I=-16:TP=-1.5:LRA=11"',
-      '-c:a aac -b:a 192k',
-      `"${audioOut}"`
-    ].join(' '), { stdio: 'inherit' })
+    runFfmpeg([
+      '-y', '-loglevel', 'error',
+      '-i', ttsMp3,
+      '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+      '-c:a', 'aac', '-b:a', '192k',
+      audioOut
+    ])
 
     if (fs.existsSync(audioOut) && fs.statSync(audioOut).size > 0) {
       console.log('Narration ready', { audioOut })
