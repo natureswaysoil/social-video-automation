@@ -206,6 +206,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+
       - run: npm install
 
       - name: Run scheduled automation
