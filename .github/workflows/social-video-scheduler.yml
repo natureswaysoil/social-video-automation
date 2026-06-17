@@ -33,11 +33,6 @@ jobs:
       contents: read
       id-token: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        retry: [1, 2]
-
     env:
       USE_SECRET_MANAGER: ''
       DEFAULT_GOOGLE_CLOUD_PROJECT: natureswaysoil-video
@@ -46,16 +41,18 @@ jobs:
       ALLOW_DIRECT_SECRETS_FALLBACK: 'false'
 
       VIDEO_PROVIDER: openai_tts
-      ENABLE_PLATFORMS: youtube,instagram
-      CI_MANDATORY_PLATFORMS: enabled
+      ENABLE_PLATFORMS: youtube,facebook
+      CI_MANDATORY_PLATFORMS: 'false'
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: gpt-4o-mini
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-      INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
-      INSTAGRAM_IG_ID: ${{ secrets.INSTAGRAM_IG_ID }}
+      FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+      FB_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+      FB_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
 
       GCS_PUBLIC_BUCKET: natureswaysoil-social-videos
       VIDEO_PUBLIC_BUCKET: natureswaysoil-social-videos
@@ -141,17 +138,17 @@ jobs:
           {
             echo "### Social Video Scheduler Auth Context"
             echo
-            echo "- Matrix retry: ${{ matrix.retry }}"
             echo "- Auth mode: $mode"
             echo "- Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
             echo "- Secret Manager enabled: ${USE_SECRET_MANAGER:-false}"
+            echo "- Enabled platforms: ${ENABLE_PLATFORMS:-unset}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate direct GitHub secrets fallback
         if: env.USE_SECRET_MANAGER == 'false'
         run: |
           set -euo pipefail
-          enabled_platforms="${ENABLE_PLATFORMS:-youtube,instagram}"
+          enabled_platforms="${ENABLE_PLATFORMS:-youtube,facebook}"
           enabled_platforms_lower="$(echo "$enabled_platforms" | tr '[:upper:]' '[:lower:]')"
           missing=()
           for name in OPENAI_API_KEY PEXELS_API_KEY; do
@@ -175,6 +172,10 @@ jobs:
             has_any YOUTUBE_CLIENT_ID || missing+=("YOUTUBE_CLIENT_ID")
             has_any YOUTUBE_CLIENT_SECRET || missing+=("YOUTUBE_CLIENT_SECRET")
             has_any YOUTUBE_REFRESH_TOKEN || missing+=("YOUTUBE_REFRESH_TOKEN")
+          fi
+          if has_platform facebook; then
+            has_any FACEBOOK_PAGE_ACCESS_TOKEN FB_PAGE_ACCESS_TOKEN || missing+=("FACEBOOK_PAGE_ACCESS_TOKEN or FB_PAGE_ACCESS_TOKEN")
+            has_any FACEBOOK_PAGE_ID FB_PAGE_ID || missing+=("FACEBOOK_PAGE_ID or FB_PAGE_ID")
           fi
           if has_platform instagram; then
             has_any INSTAGRAM_ACCESS_TOKEN || missing+=("INSTAGRAM_ACCESS_TOKEN")
