@@ -1,4 +1,3 @@
-// @ts-nocheck
 import 'dotenv/config'
 import path from 'path'
 import fs from 'fs'
@@ -6,6 +5,7 @@ import { composeVerticalAd } from './lib/ffmpeg-compositor'
 import { downloadPexelsVideo } from './lib/pexels-media'
 import { downloadProductImage, productOverlayText } from './lib/product-assets'
 import { ensureDir, safeFileName } from './lib/video-utils'
+import { runFfmpeg } from './lib/ffmpeg'
 
 const ROOT = process.cwd()
 const OUTPUT_DIR = path.resolve(ROOT, 'output')
@@ -74,15 +74,7 @@ async function build() {
 
   const thumbnail = path.resolve(OUTPUT_DIR, `${safeFileName(product.name, 'jpg')}`)
 
-  const ffmpegThumb = [
-    'ffmpeg -y',
-    `-i "${finalVideo}"`,
-    '-ss 00:00:02',
-    '-vframes 1',
-    `"${thumbnail}"`
-  ].join(' ')
-
-  require('child_process').execSync(ffmpegThumb, { stdio: 'inherit' })
+  runFfmpeg(['-y', '-i', finalVideo, '-ss', '00:00:02', '-vframes', '1', thumbnail])
 
   console.log('Vertical marketing ad completed', {
     finalVideo,

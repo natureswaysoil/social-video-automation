@@ -1,10 +1,8 @@
-// @ts-nocheck
 import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
 import OpenAI from 'openai'
-import { execSync } from 'child_process'
 import { google } from 'googleapis'
 import { Storage } from '@google-cloud/storage'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
@@ -17,6 +15,7 @@ import { formatCaption } from './lib/caption-formatter'
 import { postToTikTok, fetchBasicMetrics } from './lib/social-platforms'
 import { postToFacebookGroups } from './lib/facebook-groups'
 import { recordPerformance } from './lib/marketing-engine'
+import { runFfmpeg } from './lib/ffmpeg'
 
 type Product = {
   id: string
@@ -376,7 +375,7 @@ async function uploadVideoForSocial(videoFileOrUrl: string): Promise<string> {
 function createThumbnail(videoFile: string, product: Product): string {
   ensureDir(OUTPUT_DIR)
   const output = path.resolve(OUTPUT_DIR, `${safeFileName(`${product.name}-thumbnail`, 'jpg')}`)
-  execSync(`ffmpeg -y -loglevel error -i "${videoFile}" -ss 00:00:02 -vframes 1 "${output}"`, { stdio: 'inherit' })
+  runFfmpeg(['-y', '-loglevel', 'error', '-i', videoFile, '-ss', '00:00:02', '-vframes', '1', output])
   return output
 }
 

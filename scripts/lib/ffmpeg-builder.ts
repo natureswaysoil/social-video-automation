@@ -1,22 +1,14 @@
-// @ts-nocheck
 import fs from 'fs'
 import path from 'path'
-import { execSync } from 'child_process'
 import { ensureDir, safeFileName, wrapCaption } from './video-utils'
+import { ffmpegInstalled } from './ffmpeg'
 
 const ROOT = process.cwd()
 const OUTPUT = path.resolve(ROOT, 'output')
 
-export function ffmpegInstalled() {
-  try {
-    execSync('ffmpeg -version', { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
+export { ffmpegInstalled }
 
-export function buildSubtitleFile(scenes: any[], title: string) {
+export function buildSubtitleFile(scenes: any[], title: string): string {
   ensureDir(OUTPUT)
   const file = path.resolve(OUTPUT, safeFileName(title, 'srt'))
   let cursor = 0
