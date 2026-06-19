@@ -2,6 +2,24 @@ name: Social Video Scheduler
 
 on:
   workflow_dispatch:
+    inputs:
+      manual_video_url:
+        description: 'Optional public HTTPS video URL to post instead of generating a new video'
+        required: false
+        type: string
+      manual_video_title:
+        description: 'Optional title for manual video posting'
+        required: false
+        type: string
+      manual_video_caption:
+        description: 'Optional caption/description for manual video posting'
+        required: false
+        type: string
+      enabled_platforms:
+        description: 'Platforms to post to, comma-separated'
+        required: false
+        default: 'youtube,facebook'
+        type: string
   schedule:
     - cron: '0 13,18,23 * * *'
 
@@ -41,8 +59,11 @@ jobs:
       ALLOW_DIRECT_SECRETS_FALLBACK: 'false'
 
       VIDEO_PROVIDER: openai_tts
-      ENABLE_PLATFORMS: youtube,facebook
+      ENABLE_PLATFORMS: ${{ github.event.inputs.enabled_platforms || 'youtube,facebook' }}
       CI_MANDATORY_PLATFORMS: 'false'
+      MANUAL_VIDEO_URL: ${{ github.event.inputs.manual_video_url }}
+      MANUAL_VIDEO_TITLE: ${{ github.event.inputs.manual_video_title }}
+      MANUAL_VIDEO_CAPTION: ${{ github.event.inputs.manual_video_caption }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: gpt-4o-mini
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -142,6 +163,11 @@ jobs:
             echo "- Google project: ${GOOGLE_CLOUD_PROJECT:-unset}"
             echo "- Secret Manager enabled: ${USE_SECRET_MANAGER:-false}"
             echo "- Enabled platforms: ${ENABLE_PLATFORMS:-unset}"
+            if [ -n "${MANUAL_VIDEO_URL:-}" ]; then
+              echo "- Manual video URL supplied: yes"
+            else
+              echo "- Manual video URL supplied: no"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate direct GitHub secrets fallback
@@ -152,7 +178,7 @@ jobs:
           enabled_platforms_lower="$(echo "$enabled_platforms" | tr '[:upper:]' '[:lower:]')"
           missing=()
           for name in OPENAI_API_KEY PEXELS_API_KEY; do
-            if [ -z "${!name:-}" ]; then
+            if [ -z "${!name:-}" ] && [ -z "${MANUAL_VIDEO_URL:-}" ]; then
               missing+=("$name")
             fi
           done
@@ -214,6 +240,10 @@ jobs:
 
       - run: npm install
 
+      - name: Run manual video posting
+        if: env.RUN_POSTING == 'true' && env.MANUAL_VIDEO_URL != ''
+        run: npm run post:manual-video
+
       - name: Run scheduled automation
-        if: env.RUN_POSTING == 'true'
+        if: env.RUN_POSTING == 'true' && env.MANUAL_VIDEO_URL == ''
         run: npm run post:scheduled
