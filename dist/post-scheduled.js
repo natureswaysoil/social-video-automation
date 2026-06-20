@@ -544,8 +544,13 @@ async function main() {
     if (!products.length)
         throw new Error('No products configured');
     const { product, variationIndex, variationCount } = pickProduct(products);
-    await persistRotationStateToGcs();
+    // NOTE: rotation state is persisted to GCS only after a successful post (see end of main()).
+    // Persisting here would advance/"burn" the cursor even when render or posting fails, silently
+    // skipping that product on the next run.
     const profile = productCreativeProfile(product);
+    if (process.env.VIDEO_STYLE === 'broll_ken_burns' && !hasValue('PEXELS_API_KEY') && !product.productImageUrl && !fs_1.default.existsSync(FOOTAGE_DIR)) {
+        log('PREFLIGHT WARNING: no PEXELS_API_KEY, no product image, and no local footage/ dir. B-roll render will fail and nothing will post. Set PEXELS_API_KEY (or add productImageUrl / footage).');
+    }
     log('Scheduled product selected', { videoStyle: process.env.VIDEO_STYLE, product: product.name, id: product.id, variation: `${variationIndex + 1}/${variationCount}` });
     log('Creative mapping selected', { hasScenePlan: !!profile.scenes?.length, hasProductImage: !!product.productImageUrl, brollQueries: product.brollQueries?.length || 0 });
     const scenePlan = await generateScenePlan(product, profile, variationIndex, variationCount);
@@ -677,6 +682,8 @@ async function main() {
     }
     if (posted === 0)
         throw new Error('No platform posts succeeded');
+    // Only now that at least one platform succeeded do we advance the cross-run cursor in GCS.
+    await persistRotationStateToGcs();
     log('Scheduled post completed', { posted, videoFile, publicVideoUrl, thumbnailFile, videoIds, metrics });
 }
 main().catch((error) => { console.error('Scheduled post failed:', error?.message || error); process.exit(1); });

@@ -2,14 +2,22 @@ name: Scheduled Social Video Posting
 
 on:
   workflow_dispatch:
-  schedule:
-    # GitHub Actions uses UTC.
-    # Approx ET posting slots: 7:00 AM, 8:15 AM, 11:30 AM, 1:00 PM, 6:15 PM
-    - cron: '0 11 * * *'
-    - cron: '15 12 * * *'
-    - cron: '30 15 * * *'
-    - cron: '0 17 * * *'
-    - cron: '15 22 * * *'
+  # Scheduled triggers are intentionally DISABLED.
+  # The Cloud Run Job `social-video-broll-job` on Cloud Scheduler is the single
+  # authoritative scheduler. This workflow is kept for manual runs/tests via the
+  # "Run workflow" button. Do not re-enable the schedule below unless you have
+  # paused the Cloud Scheduler job, or you will get duplicate/competing posts.
+  # schedule:
+  #   - cron: '0 11 * * *'
+  #   - cron: '15 12 * * *'
+  #   - cron: '30 15 * * *'
+  #   - cron: '0 17 * * *'
+  #   - cron: '15 22 * * *'
+
+# Prevent overlapping manual runs from racing on the shared rotation cursor.
+concurrency:
+  group: social-video-posting
+  cancel-in-progress: false
 
 jobs:
   post:
