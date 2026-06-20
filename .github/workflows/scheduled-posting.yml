@@ -2,6 +2,22 @@ name: Scheduled Social Video Posting
 
 on:
   workflow_dispatch:
+    inputs:
+      run_posting:
+        description: 'Run the posting pipeline (set false to skip all posting steps — config/auth check only)'
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: 'Dry-run mode: render video and validate output WITHOUT publishing to social accounts'
+        required: false
+        default: false
+        type: boolean
+      target_account:
+        description: 'Comma-separated platforms to target (e.g. youtube or youtube,instagram). Leave blank for all defaults.'
+        required: false
+        default: ''
+        type: string
   # Scheduled triggers are intentionally DISABLED.
   # The Cloud Run Job `social-video-broll-job` on Cloud Scheduler is the single
   # authoritative scheduler. This workflow is kept for manual runs/tests via the
@@ -48,7 +64,10 @@ jobs:
       YT_PRIVACY_STATUS: public
       DRY_RUN_LOG_ONLY: 'false'
       ROTATION_STATE_FILE: data/rotation-state.json
-      RUN_POSTING: 'true'
+      # Dispatch input: inputs.run_posting defaults to true; only set to false via explicit dispatch.
+      RUN_POSTING: ${{ inputs.run_posting == false && 'false' || 'true' }}
+      # Dispatch input: dry_run=true renders the video but skips all social publishing API calls.
+      POSTING_DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
 
       # Public video hosting for Instagram/Facebook.
       # The automation uploads each rendered MP4 to:
@@ -182,6 +201,37 @@ jobs:
             echo "- Mandatory platform mode: ${CI_MANDATORY_PLATFORMS:-unset}"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Apply dispatch input overrides
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TARGET_ACCOUNT_INPUT: ${{ inputs.target_account }}
+        run: |
+          set -euo pipefail
+          # Override ENABLE_PLATFORMS when caller specified a target_account.
+          if [ -n "${TARGET_ACCOUNT_INPUT:-}" ]; then
+            echo "Overriding ENABLE_PLATFORMS to: $TARGET_ACCOUNT_INPUT"
+            echo "ENABLE_PLATFORMS=$TARGET_ACCOUNT_INPUT" >> "$GITHUB_ENV"
+          fi
+
+          # Surface the dispatch run mode in the job summary.
+          run_posting="${RUN_POSTING:-true}"
+          posting_dry_run="${POSTING_DRY_RUN:-false}"
+          {
+            echo "### Manual Dispatch Run"
+            echo
+            if [ "$posting_dry_run" = "true" ]; then
+              echo "- **Mode:** :test_tube: **Dry-run** — video will be rendered but NOT published to social accounts"
+            elif [ "$run_posting" = "false" ]; then
+              echo "- **Mode:** :no_entry: **Posting disabled** — posting steps skipped"
+            else
+              echo "- **Mode:** :rocket: **Live posting** — video will be rendered and published"
+            fi
+            echo "- run_posting: $run_posting"
+            echo "- dry_run (POSTING_DRY_RUN): $posting_dry_run"
+            echo "- target_account input: ${TARGET_ACCOUNT_INPUT:-(default)}"
+            echo "- Effective ENABLE_PLATFORMS: ${ENABLE_PLATFORMS:-unset}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Validate direct GitHub secrets fallback
         if: env.USE_SECRET_MANAGER == 'false'
         run: |
@@ -263,7 +313,7 @@ jobs:
         run: npm run post:scheduled
 
       - name: Fallback YouTube-only post if full social run fails
-        if: env.RUN_POSTING == 'true' && steps.scheduled_post.outcome == 'failure'
+        if: env.RUN_POSTING == 'true' && env.POSTING_DRY_RUN != 'true' && steps.scheduled_post.outcome == 'failure'
         env:
           ENABLE_PLATFORMS: youtube
           CI_MANDATORY_PLATFORMS: 'false'
@@ -273,8 +323,18 @@ jobs:
           npm run post:scheduled
 
       - name: Optional analytics backfill (after 24h)
-        if: env.RUN_POSTING == 'true' && env.RUN_ANALYTICS_BACKFILL == 'true'
+        if: env.RUN_POSTING == 'true' && env.POSTING_DRY_RUN != 'true' && env.RUN_ANALYTICS_BACKFILL == 'true'
         run: npm run fetch:analytics
+
+      - name: Upload dry-run artifacts
+        if: env.RUN_POSTING == 'true' && env.POSTING_DRY_RUN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-output-${{ github.run_id }}
+          path: |
+            output/
+            temp-scheduled/
+          if-no-files-found: ignore
 
       - name: Save rotation state cache
         if: always() && env.RUN_POSTING == 'true'

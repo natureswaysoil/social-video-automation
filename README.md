@@ -77,6 +77,44 @@ GitHub Actions uses UTC. Current approximate ET slots:
 - 1:00 PM
 - 6:15 PM
 
+## Manual runs and dry-run via GitHub Actions
+
+Open **Actions → Scheduled Social Video Posting → Run workflow** and fill in the inputs:
+
+| Input | Default | Description |
+|---|---|---|
+| `run_posting` | `true` | Set to `false` to skip all posting steps (config/auth check only, no render). |
+| `dry_run` | `false` | Set to `true` to render the video and validate output **without publishing** to any social account. |
+| `target_account` | *(blank — all platforms)* | Comma-separated platforms, e.g. `youtube` or `youtube,instagram`. Leave blank for the workflow default (`youtube,instagram,facebook,facebook_groups`). |
+
+### Full dry-run (renders video, skips publishing)
+
+```
+run_posting:    true
+dry_run:        true
+target_account: youtube
+```
+
+Expected output:
+- FFmpeg is installed and the version is logged.
+- Video is rendered and a thumbnail is created.
+- Log line: `[DRY RUN] Video and thumbnail generated successfully. Skipping social media publishing.`
+- Rendered video and thumbnail are uploaded as the workflow artifact **`dry-run-output-<run_id>`**.
+
+### Full live run (posts to all platforms)
+
+```
+run_posting:    true
+dry_run:        false
+target_account: (leave blank)
+```
+
+### Skip all posting steps (auth/config check only)
+
+```
+run_posting: false
+```
+
 ## Required GitHub repo secrets
 
 Add one of these service-account secrets so the Action can read Google Secret Manager:

@@ -603,6 +603,19 @@ async function main() {
   }
   const videoFile = await renderVideo(product, profile, scenePlan)
   const thumbnailFile = createThumbnail(videoFile, product)
+
+  // Dry-run posting mode: video rendered, but skip all social publishing API calls.
+  if (String(process.env.POSTING_DRY_RUN || '').toLowerCase() === 'true') {
+    log('[DRY RUN] Video and thumbnail generated successfully. Skipping social media publishing.', {
+      videoFile,
+      thumbnailFile,
+      platforms,
+      captions,
+      voiceover: scenePlan.fullVoiceover
+    })
+    return
+  }
+
   let publicVideoUrl = ''
   if (platforms.includes('instagram') || platforms.includes('facebook') || platforms.includes('tiktok') || platforms.includes('facebook_groups')) {
     publicVideoUrl = await uploadVideoForSocial(videoFile)
