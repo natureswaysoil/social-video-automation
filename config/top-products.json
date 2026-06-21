@@ -1,216 +1,148 @@
 {
   "topProducts": [
     {
-      "id": "NWS_023",
-      "name": "Hay, Pasture & Lawn Recovery System with Liquid Biochar - 2.5 Gallon",
-      "description": "Premium 2.5 gallon concentrate with liquid biochar, yucca, humic and fulvic acids, kelp, and beneficial biology for hay fields, pastures, lawns, and turf. Covers up to 2 to 5 acres depending on use rate and conditions.",
-      "category": "hay pasture lawn recovery liquid biochar",
-      "websiteUrl": "https://www.natureswaysoil.com/pasture-boost",
-      "amazonUrl": "https://www.amazon.com/dp/B0DXP97C6F",
-      "productImagePath": "/images/products/NWS_021/main.jpg",
-      "gtin": "00860015921628",
-      "price": 199.99,
-      "size": "2.5 gallon concentrate",
-      "keywords": [
-        "liquid biochar",
-        "pasture recovery",
-        "hay field fertilizer",
-        "lawn recovery",
-        "yucca",
-        "soil conditioner",
-        "2.5 gallon concentrate"
-      ],
-      "brollQueries": [
-        "green pasture grass field",
-        "dry pasture grass before treatment",
-        "spraying pasture field",
-        "healthy hay field sunset",
-        "lush green lawn close up",
-        "farm field grass aerial"
-      ]
-    },
-    {
-      "id": "NWS_024",
-      "name": "Living Soil Revitalizer - 4 lb Worm Castings & Activated Biochar",
-      "description": "Premium 4 pound soil amendment with worm castings, activated biochar, compost-based organic matter, duckweed nutrients, and beneficial soil biology for gardens, raised beds, flowers, vegetables, and potted plants.",
-      "category": "living soil revitalizer worm castings biochar",
-      "websiteUrl": "https://www.natureswaysoil.com/living-compost",
-      "amazonUrl": "https://www.amazon.com/dp/B0DXP97C6F",
-      "productImagePath": "/images/products/NWS_013/main.jpg",
-      "price": 24.99,
-      "size": "4 lb bag",
-      "keywords": [
-        "worm castings",
-        "activated biochar",
-        "living soil",
-        "soil amendment",
-        "raised beds",
-        "garden soil",
-        "compost biology"
-      ],
-      "brollQueries": [
-        "hands holding rich garden soil",
-        "worm castings compost close up",
-        "mixing soil in raised bed",
-        "vegetable garden raised bed",
-        "potted plant soil amendment",
-        "healthy plant roots in soil"
-      ]
-    },
-    {
-      "id": "NWS_025",
-      "name": "Dog Urine Odor Eliminator for Outdoor Surfaces",
-      "description": "Pet-safe outdoor enzyme deodorizer for grass, concrete, patios, kennels, artificial turf, yards, and dog runs. Designed to help remove outdoor pet odors instead of covering them up.",
-      "category": "dog urine odor eliminator outdoor enzyme deodorizer",
-      "websiteUrl": "https://www.natureswaysoil.com/lawn-repair",
-      "amazonUrl": "https://www.amazon.com/dp/B0DXP97C6F",
+      "id": "NWS_014",
+      "name": "Dog Urine Neutralizer & Lawn Revitalizer - 32 oz",
+      "description": "Naturally dark, enzyme and humic-acid lawn treatment that addresses dog urine damage at the soil level. No green dyes and no instant cosmetic cover-up - it helps the soil and grass recover over time. Pet-safe and lawn-safe when used as directed.",
+      "category": "dog urine lawn repair soil",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_014",
+      "amazonUrl": "https://www.amazon.com/dp/B0FG38YYJ5",
       "productImagePath": "/images/products/NWS_014/main.jpg",
-      "price": 39.99,
-      "size": "1 gallon",
+      "gtin": "",
+      "price": 29.99,
+      "size": "32 fl oz concentrate",
       "keywords": [
-        "dog urine odor",
-        "enzyme deodorizer",
-        "outdoor pet odor",
-        "kennel odor",
-        "artificial turf",
-        "patio deodorizer",
-        "pet safe"
+        "dog urine neutralizer",
+        "lawn revitalizer",
+        "dog spot repair",
+        "enzyme lawn treatment",
+        "pet safe lawn",
+        "humic acid"
       ],
       "brollQueries": [
-        "dog running on backyard lawn",
-        "clean concrete patio with dog",
-        "artificial turf pet area",
-        "outdoor kennel cleaning",
-        "spraying patio with garden sprayer",
-        "dog yard odor removal"
+        "dog sitting on green lawn backyard",
+        "brown grass spot lawn damage",
+        "happy dog running green grass",
+        "healthy green lawn close up",
+        "watering lawn garden hose",
+        "golden retriever backyard grass"
       ]
     },
     {
       "id": "NWS_026",
-      "name": "Lawn & Soil Recovery System - Liquid Humic & Fulvic Acid with Kelp",
-      "description": "One gallon liquid concentrate with humic acid, fulvic acid, and organic kelp to support lawn health, root development, soil conditioning, nutrient availability, gardens, lawns, and pastures.",
-      "category": "liquid humic fulvic acid kelp lawn soil recovery",
-      "websiteUrl": "https://www.natureswaysoil.com/soil-boost",
-      "amazonUrl": "https://www.amazon.com/dp/B0DXP97C6F",
-      "productImagePath": "/images/products/NWS_011/main.jpg",
-      "price": 39.99,
+      "name": "Lawn & Soil Recovery System - 1 Gallon",
+      "description": "One gallon liquid concentrate of humic acid, fulvic acid, and organic kelp. Works as a natural soil conditioner that improves soil structure, supports nutrient availability, and encourages stronger root growth for lawns, gardens, and pastures.",
+      "category": "lawn soil recovery humic fulvic kelp",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_026",
+      "amazonUrl": "https://www.amazon.com/dp/B0F9V3K9L7",
+      "productImagePath": "/images/products/NWS_026/main.jpg",
+      "gtin": "",
+      "price": 44.99,
       "size": "1 gallon concentrate",
       "keywords": [
-        "humic acid",
-        "fulvic acid",
-        "kelp",
         "lawn recovery",
-        "yellow grass",
-        "root development",
-        "soil conditioning"
-      ],
-      "brollQueries": [
-        "yellow grass turning green lawn",
-        "spraying lawn with hose sprayer",
-        "healthy grass roots close up",
-        "liquid fertilizer mixing in watering can",
-        "lush green lawn close up",
-        "garden soil conditioner application"
-      ]
-    },
-    {
-      "id": "NWS_014",
-      "name": "Dog Urine Neutralizer & Lawn Revitalizer",
-      "description": "Helps support lawn and soil recovery where dog urine has stressed the grass. Soil-first lawn care, not a temporary green dye.",
-      "category": "dog urine lawn repair",
-      "websiteUrl": "https://www.natureswaysoil.com/lawn-repair",
-      "productImagePath": "/images/products/NWS_014/main.jpg",
-      "keywords": [
-        "dog urine",
-        "yellow spots",
-        "lawn repair",
-        "pet safe"
-      ],
-      "brollQueries": [
-        "dog walking on green lawn",
-        "yellow grass patches lawn",
-        "garden hose watering lawn",
-        "lush green backyard lawn"
-      ]
-    },
-    {
-      "id": "NWS_011",
-      "name": "Liquid Humic & Fulvic Acid with Kelp",
-      "description": "Liquid soil booster blending humic acid, fulvic acid, and kelp for stronger roots and better nutrient uptake support.",
-      "category": "humic fulvic kelp soil booster",
-      "websiteUrl": "https://www.natureswaysoil.com/soil-boost",
-      "productImagePath": "/images/products/NWS_011/main.jpg",
-      "keywords": [
+        "soil conditioner",
         "humic acid",
         "fulvic acid",
-        "kelp",
-        "soil health"
+        "liquid kelp",
+        "yellow grass",
+        "root growth"
       ],
       "brollQueries": [
-        "rich soil close up",
-        "plant roots in soil",
-        "liquid kelp fertilizer mixing",
-        "vegetable garden growing"
-      ]
-    },
-    {
-      "id": "NWS_013",
-      "name": "Enhanced Living Compost with Worm Castings & Biochar",
-      "description": "Concentrated living compost with worm castings, biochar, and fermented duckweed extract for soil improvement support.",
-      "category": "living compost worm castings biochar",
-      "websiteUrl": "https://www.natureswaysoil.com/living-compost",
-      "productImagePath": "/images/products/NWS_013/main.jpg",
-      "keywords": [
-        "compost",
-        "worm castings",
-        "biochar",
-        "duckweed"
-      ],
-      "brollQueries": [
-        "rich compost soil close up",
-        "worm castings compost",
-        "raised bed vegetable garden",
-        "hands holding healthy soil"
+        "yellow patchy lawn grass",
+        "lush green lawn close up",
+        "grass roots soil cross section",
+        "pouring liquid fertilizer watering can",
+        "healthy garden soil hands",
+        "green backyard lawn sunny"
       ]
     },
     {
       "id": "NWS_021",
-      "name": "Hay, Pasture & Lawn Fertilizer",
-      "description": "Liquid fertilizer for hay, pasture, and lawn areas where landowners want stronger-looking grass and better soil support.",
-      "category": "hay pasture lawn fertilizer",
-      "websiteUrl": "https://www.natureswaysoil.com/pasture-boost",
+      "name": "Hay, Pasture & Lawn Fertilizer - 2.5 Gallon",
+      "description": "Organic liquid fertilizer with worm castings, kelp, humic acid, yucca, and beneficial microbes, upgraded with advanced filtration for clean, clog-free spraying. Works at the root level to support faster forage regrowth. Safe for horses, cattle, and all livestock with no withdrawal period.",
+      "category": "hay pasture lawn fertilizer livestock safe",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_021",
+      "amazonUrl": "https://www.amazon.com/dp/B0DFV4YZ61",
       "productImagePath": "/images/products/NWS_021/main.jpg",
+      "gtin": "00860015921628",
+      "price": 99.99,
+      "size": "2.5 gallon concentrate",
       "keywords": [
-        "hay",
-        "pasture",
-        "lawn fertilizer",
-        "grass growth"
+        "hay fertilizer",
+        "pasture fertilizer",
+        "livestock safe",
+        "forage regrowth",
+        "worm castings",
+        "organic liquid fertilizer",
+        "boom sprayer"
       ],
       "brollQueries": [
-        "green pasture grass field",
-        "hay bales farm field",
-        "cattle grazing pasture",
-        "lush grass close up"
+        "green pasture field rolling hills",
+        "round hay bales field",
+        "cattle grazing green pasture",
+        "boom sprayer tractor field",
+        "horses grazing pasture",
+        "hay field sunset farm"
       ]
     },
     {
-      "id": "NWS_018",
-      "name": "Seaweed & Humic Acid Lawn Treatment",
-      "description": "Liquid lawn treatment combining seaweed extract and humic acid for greener turf and healthier root-zone support.",
-      "category": "seaweed humic lawn treatment",
-      "websiteUrl": "https://www.natureswaysoil.com/soil-boost",
-      "productImagePath": "/images/products/NWS_018/main.jpg",
+      "id": "NWS_027",
+      "name": "Liquid Biochar Soil Conditioner - 1 Gallon",
+      "description": "Concentrated soil conditioner built around activated 5-micron biochar with humic acid, fulvic acid, and kelp. Helps soil hold water and nutrients like a microscopic sponge, supports beneficial soil life, and works as a soil drench, compost tea booster, transplant solution, or all-around conditioner.",
+      "category": "liquid biochar soil conditioner humic fulvic kelp",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_027",
+      "amazonUrl": "https://www.amazon.com/dp/B0F8XYZBIO",
+      "productImagePath": "/images/products/NWS_027/main.jpg",
+      "gtin": "",
+      "price": 89.99,
+      "size": "1 gallon concentrate",
       "keywords": [
-        "seaweed",
+        "liquid biochar",
+        "soil conditioner",
+        "water retention",
         "humic acid",
-        "lawn",
+        "fulvic acid",
+        "kelp",
+        "sandy soil",
+        "compost tea"
+      ],
+      "brollQueries": [
+        "dry cracked sandy soil",
+        "rich dark garden soil hands",
+        "biochar charcoal soil close up",
+        "watering garden bed",
+        "plant roots soil growth",
+        "compost pile garden"
+      ]
+    },
+    {
+      "id": "NWS_028",
+      "name": "Fruit Tree Fertilizer with Liquid Biochar - 32 oz",
+      "description": "Concentrated liquid fruit tree feed with liquid biochar that supports blooms, fruit set, and stronger roots while conditioning the soil. Biochar helps hold nutrients in the root zone for apple, peach, pear, citrus, and more. A 32 oz bottle makes up to 64 gallons.",
+      "category": "fruit tree fertilizer liquid biochar orchard",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_028",
+      "amazonUrl": "https://www.amazon.com/dp/B0GTBZ7N56",
+      "productImagePath": "/images/products/NWS_028/main.jpg",
+      "gtin": "",
+      "price": 29.99,
+      "size": "32 oz concentrate (makes up to 64 gallons)",
+      "keywords": [
+        "fruit tree fertilizer",
+        "liquid biochar",
+        "orchard feed",
+        "bloom booster",
+        "fruit set",
+        "apple peach pear citrus",
         "root zone"
       ],
       "brollQueries": [
-        "lush green lawn close up",
-        "seaweed extract lawn treatment",
-        "watering green grass",
-        "healthy lawn sunset"
+        "apple tree orchard fruit",
+        "peach tree blossoms spring",
+        "citrus tree fruit close up",
+        "orchard rows sunny",
+        "watering fruit tree base",
+        "ripe fruit tree branch"
       ]
     }
   ]
