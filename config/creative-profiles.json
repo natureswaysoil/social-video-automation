@@ -1,243 +1,258 @@
 {
   "defaults": {
-    "tone": "plainspoken, practical, trusted small family farm brand",
+    "tone": "warm, conversational, down-to-earth family farm voice; talking to a neighbor, not selling at them",
     "format": "25-30 second vertical short",
     "cta": "See the full product details at Nature's Way Soil."
   },
   "profiles": {
-    "NWS_023": {
-      "audience": "landowners, hay producers, pasture managers, horse owners, cattle owners, and rural homeowners with stressed grass",
-      "angle": "premium liquid biochar pasture and lawn recovery support for soil, root zone, and large acreage use",
-      "tone": "rural, direct, no hype, no goofy visuals, no fake before-and-after claims",
-      "cta": "See the Hay, Pasture & Lawn Recovery System at Nature's Way Soil.",
-      "hooks": [
-        "Tired pasture does not need a gimmick — it needs root-zone and soil support.",
-        "For hay, pasture, and lawn recovery, start below the grass blade.",
-        "Large acreage grass problems usually start in the soil."
-      ],
-      "scenes": [
-        {
-          "name": "Stressed Pasture Problem",
-          "seconds": 6,
-          "voiceover": "If your hay field, pasture, or lawn looks tired, the problem may be deeper than the leaf blade.",
-          "brollQuery": "dry pasture grass field",
-          "caption": "TIRED PASTURE?"
-        },
-        {
-          "name": "Product System",
-          "seconds": 6,
-          "voiceover": "Nature's Way Soil Hay, Pasture and Lawn Recovery System is built around liquid biochar, humic and fulvic acids, kelp, yucca, and beneficial biology.",
-          "brollQuery": "liquid fertilizer jug on farm grass",
-          "caption": "LIQUID BIOCHAR SYSTEM",
-          "useProductImage": true
-        },
-        {
-          "name": "Field Application",
-          "seconds": 6,
-          "voiceover": "Apply it as a soil-focused liquid program for acreage, pasture, hay ground, and larger lawn areas.",
-          "brollQuery": "tractor spraying pasture field",
-          "caption": "BUILT FOR ACREAGE"
-        },
-        {
-          "name": "Root Zone Support",
-          "seconds": 6,
-          "voiceover": "The goal is better root-zone support, soil conditioning, and nutrient movement — not a temporary green dye.",
-          "brollQuery": "healthy grass roots soil close up",
-          "caption": "ROOT-ZONE SUPPORT"
-        },
-        {
-          "name": "CTA",
-          "seconds": 5,
-          "voiceover": "For use rates and product details, visit Nature's Way Soil or shop direct online.",
-          "brollQuery": "green hay field pasture sunset",
-          "caption": "SHOP NATURE'S WAY SOIL",
-          "useProductImage": true
-        }
-      ]
-    },
-    "NWS_024": {
-      "audience": "gardeners, raised-bed growers, and homeowners fixing compacted or lifeless soil",
-      "angle": "problem-first living-soil revitalizer sequence based on the May 6 winning visual cadence",
-      "tone": "practical, fast-paced, visual-first, no overpromising",
-      "cta": "See full product details at natureswaysoil.com.",
-      "hooks": [
-        "If your soil looks tired, start with biology before adding more fertilizer.",
-        "Weak growth often starts below the surface, not above it.",
-        "Healthy plants need healthy living soil first."
-      ],
-      "scenes": [
-        {
-          "name": "scroll-stopping problem close-up",
-          "seconds": 4,
-          "voiceover": "If your plants look stuck, the real issue may be exhausted soil biology.",
-          "brollQuery": "thin patchy garden soil close up",
-          "caption": "SOIL LOOKS TIRED?"
-        },
-        {
-          "name": "product bottle hero shot",
-          "seconds": 5,
-          "voiceover": "Nature's Way Soil Living Soil Revitalizer combines worm castings and activated biochar for soil-first support.",
-          "brollQuery": "soil amendment product bag in garden",
-          "caption": "LIVING SOIL REVITALIZER",
-          "useProductImage": true
-        },
-        {
-          "name": "mixing or application",
-          "seconds": 6,
-          "voiceover": "Top-dress or mix into raised beds and containers as part of your normal routine.",
-          "brollQuery": "mixing compost into raised bed",
-          "caption": "EASY TO APPLY"
-        },
-        {
-          "name": "soil/root/grass benefit close-up",
-          "seconds": 6,
-          "voiceover": "The goal is better structure, root-zone support, and improved nutrient movement.",
-          "brollQuery": "healthy roots rich soil close up",
-          "caption": "ROOT-ZONE SUPPORT"
-        },
-        {
-          "name": "healthier result with CTA mood",
-          "seconds": 7,
-          "voiceover": "For full use directions and product details, visit natureswaysoil.com.",
-          "brollQuery": "healthy raised bed garden result",
-          "caption": "LEARN MORE AT NATURESWAYSOIL.COM",
-          "useProductImage": true
-        }
-      ]
-    },
-    "NWS_025": {
-      "audience": "dog owners with outdoor turf, patio, kennel, and yard odor spots",
-      "angle": "outdoor pet odor removal with practical application visuals and clear CTA",
-      "tone": "friendly, practical, no hype, no overpromising",
-      "cta": "See full product details at natureswaysoil.com.",
-      "hooks": [
-        "Outdoor pet odors need more than a quick fragrance cover-up.",
-        "If your dog area smells even after rinsing, treat the source.",
-        "Keep patios, turf, and pet zones fresher with a pet-safe routine."
-      ],
-      "scenes": [
-        {
-          "name": "Outdoor odor problem",
-          "seconds": 5,
-          "voiceover": "If your backyard, patio, or kennel keeps smelling like pet urine, the odor source is still there.",
-          "brollQueries": ["dog running on backyard lawn", "outdoor kennel dog area", "dog on patio"],
-          "caption": "OUTDOOR PET ODOR?"
-        },
-        {
-          "name": "Product intro",
-          "seconds": 5,
-          "voiceover": "Nature's Way Soil Dog Urine Odor Eliminator is made for outdoor surfaces and pet zones.",
-          "brollQueries": ["pet deodorizer spray bottle lawn", "dog yard cleaning spray", "outdoor pet odor eliminator"],
-          "caption": "DOG URINE ODOR ELIMINATOR",
-          "useProductImage": true
-        },
-        {
-          "name": "Apply to surfaces",
-          "seconds": 6,
-          "voiceover": "Spray grass, concrete, patios, kennel runs, or artificial turf as directed on the label.",
-          "brollQueries": ["spraying concrete patio with garden sprayer", "spraying artificial turf pet area", "cleaning outdoor kennel floor"],
-          "caption": "SPRAY WHERE ODORS START"
-        },
-        {
-          "name": "Everyday pet spaces",
-          "seconds": 6,
-          "voiceover": "Use it as part of regular outdoor pet-area maintenance instead of masking smells.",
-          "brollQueries": ["clean backyard with dog", "pet owner rinsing patio", "dog yard maintenance"],
-          "caption": "PET-SAFE OUTDOOR ROUTINE"
-        },
-        {
-          "name": "CTA",
-          "seconds": 6,
-          "voiceover": "For full directions and product details, visit natureswaysoil.com.",
-          "brollQueries": ["dog relaxing on clean patio", "fresh backyard lawn with dog", "outdoor pet area sunset"],
-          "caption": "LEARN MORE AT NATURESWAYSOIL.COM",
-          "useProductImage": true
-        }
-      ]
-    },
     "NWS_014": {
-      "audience": "dog owners with yellow lawn spots, pet areas, kennels, patios, and turf runs",
-      "angle": "soil-first lawn recovery instead of green dye or cover-up",
-      "tone": "friendly pet owner, practical lawn help, clear CTA, no overpromising",
-      "cta": "For the lawn repair directions, visit Nature's Way Soil.",
+      "audience": "dog owners with brown spots and damaged grass in their yard",
+      "angle": "fix dog urine lawn damage at the soil level, not with green dye",
+      "tone": "warm, friendly, dog-lover to dog-lover; honest, no hype",
+      "cta": "Find the Dog Urine Neutralizer & Lawn Revitalizer at Nature's Way Soil.",
       "hooks": [
-        "Dog spots are not just a color problem — they are a soil stress problem.",
-        "If your lawn keeps getting yellow dog spots, the soil needs support, not a quick cover-up.",
-        "For pet lawns, the best fix starts below the grass blade."
+        "Love your dog, just not the brown spots they leave behind? Let's fix that.",
+        "Those yellow-brown patches in the yard start down in the soil, not on the grass.",
+        "If green dyes never really fixed your dog spots, here's a different way to go."
       ],
       "scenes": [
-        { "name": "problem", "seconds": 7, "voiceover": "If your dog keeps leaving yellow spots on the lawn, the grass and soil need support, not just a quick rinse.", "brollQueries": ["dog walking on green lawn", "yellow grass patches lawn", "dog backyard lawn"] },
-        { "name": "soil cause", "seconds": 8, "voiceover": "Dog urine changes the salt balance and pH of the soil, stressing the grass at root level — not just the surface.", "brollQueries": ["close up grass roots soil", "dry yellow grass close up", "healthy soil close up"] },
-        { "name": "apply", "seconds": 8, "voiceover": "Apply Nature's Way Soil Dog Urine Neutralizer to the affected areas with a garden hose sprayer as part of your regular lawn care.", "brollQueries": ["garden hose watering lawn", "spraying lawn with hose", "watering backyard grass"] },
-        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["lush green backyard lawn", "healthy green grass close up", "dog on green lawn"] }
+        {
+          "name": "Problem",
+          "seconds": 6,
+          "voiceover": "We love our dogs. Those brown spots they leave in the yard, not so much. And the truth is, that damage starts down in the soil.",
+          "brollQuery": "dog sitting on green lawn backyard",
+          "caption": "LOVE THE DOG, NOT THE SPOTS"
+        },
+        {
+          "name": "Product",
+          "seconds": 6,
+          "voiceover": "Nature's Way Soil Dog Urine Neutralizer is a naturally dark, enzyme and humic-acid lawn treatment. No green dye, no instant cover-up.",
+          "brollQuery": "hand holding white bottle lawn",
+          "caption": "NOT A DYE",
+          "useProductImage": true
+        },
+        {
+          "name": "How it works",
+          "seconds": 6,
+          "voiceover": "The enzymes help break down the urine salts and waste left behind, while humic and fulvic acids help your soil recover so grass can grow back.",
+          "brollQuery": "healthy grass roots soil close up",
+          "caption": "WORKS IN THE SOIL"
+        },
+        {
+          "name": "Pet safe",
+          "seconds": 6,
+          "voiceover": "It also helps neutralize the odors and scent markers that keep bringing your dog back to the same spot, and it's made to be pet-safe and lawn-safe, with no bleach or ammonia.",
+          "brollQuery": "happy dog running green grass",
+          "caption": "PET-SAFE & LAWN-SAFE"
+        },
+        {
+          "name": "CTA",
+          "seconds": 5,
+          "voiceover": "Soak the spot, give it a little time, and let your lawn rebuild. Find the Dog Urine Neutralizer and Lawn Revitalizer at Nature's Way Soil.",
+          "brollQuery": "lush green backyard lawn",
+          "caption": "NATURE'S WAY SOIL",
+          "useProductImage": true
+        }
       ]
     },
-    "NWS_011": {
-      "audience": "gardeners and lawn owners dealing with tired soil, nutrient lockout, and weak roots",
-      "angle": "humic, fulvic, and kelp support the root zone and nutrient movement",
-      "tone": "soil educator, clear, credible, clear CTA, no overpromising",
-      "cta": "Learn more at Nature's Way Soil.",
+    "NWS_026": {
+      "audience": "homeowners with tired, yellowing lawns and gardeners wanting healthier soil",
+      "angle": "feed the soil with humic, fulvic, and kelp so roots and color come back",
+      "tone": "warm, encouraging, practical neighbor",
+      "cta": "See the Lawn & Soil Recovery System at Nature's Way Soil.",
       "hooks": [
-        "If plants are fed but still look stuck, the issue may be the soil, not the fertilizer.",
-        "Humic, fulvic, and kelp help support the part of the plant you cannot see — the root zone.",
-        "Better plant growth starts with better soil movement."
+        "Yellowing, tired-looking lawn? The fix might be in the soil, not the fertilizer.",
+        "Before you dump more nitrogen on it, give your soil what it's actually missing.",
+        "Stronger roots make a greener lawn, and that starts underground."
       ],
       "scenes": [
-        { "name": "problem", "seconds": 7, "voiceover": "If your plants look stuck or the lawn seems fed but still thin, the soil may not be moving nutrients effectively.", "brollQueries": ["weak garden plants", "dry garden soil close up", "stressed vegetable garden"] },
-        { "name": "root zone", "seconds": 8, "voiceover": "Humic and fulvic acids help support the root zone and nutrient movement in the soil at the microbial level.", "brollQueries": ["plant roots in soil", "healthy white roots close up", "rich soil close up"] },
-        { "name": "ingredients", "seconds": 8, "voiceover": "Combined with organic kelp, this liquid concentrate supports soil conditioning and root-zone activity.", "brollQueries": ["kelp extract lawn treatment", "liquid kelp fertilizer mixing", "liquid fertilizer pouring"] },
-        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["healthy vegetable garden", "lush garden plants", "green lawn close up"] }
-      ]
-    },
-    "NWS_013": {
-      "audience": "raised bed, container, and garden growers who want a concentrated soil amendment",
-      "angle": "worm castings, biochar, compost, and duckweed extract for living soil support",
-      "tone": "warm family farm, soil-building focus, clear CTA, no overpromising",
-      "cta": "See how to use it at Nature's Way Soil.",
-      "hooks": [
-        "This is not ordinary bagged dirt — it is a concentrated soil-building blend.",
-        "Healthy gardens start with living soil, not just more fertilizer.",
-        "For raised beds and containers, a little biology can go a long way."
-      ],
-      "scenes": [
-        { "name": "problem", "seconds": 7, "voiceover": "If your raised beds or containers look tired after a growing season, the soil biology may need a reset.", "brollQueries": ["raised bed garden soil", "container garden soil", "dry potting soil close up"] },
-        { "name": "ingredients", "seconds": 8, "voiceover": "Nature's Way Soil Enhanced Living Compost blends worm castings, activated biochar, and fermented duckweed extract for soil-first support.", "brollQueries": ["worm castings compost", "biochar soil close up", "hands holding compost"] },
-        { "name": "use", "seconds": 8, "voiceover": "Top-dress or mix into raised beds and containers as part of your regular soil care routine according to label directions.", "brollQueries": ["mixing compost into raised bed", "gardener adding soil to plants", "planting vegetable starts"] },
-        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["healthy raised bed vegetables", "lush vegetable garden", "hands holding healthy soil"] }
+        {
+          "name": "Problem",
+          "seconds": 6,
+          "voiceover": "If your lawn looks yellow and worn out no matter what you feed it, the real issue is usually down in the soil.",
+          "brollQuery": "yellow patchy lawn grass",
+          "caption": "TIRED, YELLOW LAWN?"
+        },
+        {
+          "name": "Product",
+          "seconds": 6,
+          "voiceover": "The Nature's Way Soil Lawn and Soil Recovery System is a simple liquid blend of humic acid, fulvic acid, and organic kelp.",
+          "brollQuery": "hand holding fertilizer jug lawn",
+          "caption": "HUMIC, FULVIC & KELP",
+          "useProductImage": true
+        },
+        {
+          "name": "How it works",
+          "seconds": 6,
+          "voiceover": "It works as a natural soil conditioner, improving soil structure, helping nutrients become more available, and supporting stronger, healthier roots.",
+          "brollQuery": "grass roots soil cross section",
+          "caption": "CONDITIONS THE SOIL"
+        },
+        {
+          "name": "Easy to use",
+          "seconds": 6,
+          "voiceover": "Just mix about two ounces per gallon of water. One gallon of concentrate covers a lot of ground, and it's good for lawns, gardens, and pastures alike.",
+          "brollQuery": "pouring liquid fertilizer watering can",
+          "caption": "MIX 2 OZ / GALLON"
+        },
+        {
+          "name": "CTA",
+          "seconds": 5,
+          "voiceover": "Feed the soil, and the green tends to follow. See the Lawn and Soil Recovery System at Nature's Way Soil.",
+          "brollQuery": "green backyard lawn sunny",
+          "caption": "NATURE'S WAY SOIL",
+          "useProductImage": true
+        }
       ]
     },
     "NWS_021": {
-      "audience": "landowners, small farms, horse owners, cattle owners, hay and pasture managers",
-      "angle": "liquid pasture and lawn support for stronger-looking grass and better soil support",
-      "tone": "rural, practical, no-nonsense, clear CTA, no overpromising",
-      "cta": "For hay and pasture use directions, visit Nature's Way Soil.",
+      "audience": "landowners, hay producers, pasture managers, horse and cattle owners",
+      "angle": "one organic liquid that feeds pasture, hay, and lawn and is safe for livestock same day",
+      "tone": "warm, rural, straight-talking; no hype, no gimmicks",
+      "cta": "See the Hay, Pasture & Lawn Fertilizer at Nature's Way Soil.",
       "hooks": [
-        "Pasture grass needs more than a quick green-up — it needs soil support.",
-        "If your hay field or pasture looks tired, start with the soil under the stand.",
-        "For hay, pasture, and lawn, stronger grass starts in the root zone."
+        "Want faster regrowth between cuttings? It starts down at the root.",
+        "One organic liquid that feeds your pasture, your hay field, and your lawn.",
+        "Safe enough that your animals can graze the same day you spray."
       ],
       "scenes": [
-        { "name": "field problem", "seconds": 7, "voiceover": "If your pasture or hay field looks thin and tired, the problem usually starts in the soil under the grass stand.", "brollQueries": ["dry pasture grass field", "thin pasture grass", "farm pasture field"] },
-        { "name": "use case", "seconds": 8, "voiceover": "Nature's Way Soil Hay, Pasture and Lawn Fertilizer is a liquid support program built for large grass areas, hay ground, and pasture.", "brollQueries": ["green pasture grass field", "hay bales farm field", "cattle grazing pasture"] },
-        { "name": "application", "seconds": 8, "voiceover": "Apply with a boom sprayer, hose-end applicator, or injection system as directed on the label for your acreage.", "brollQueries": ["spraying pasture field", "tractor spraying field", "farm field grass close up"] },
-        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["lush pasture grass", "green hay field", "horse grazing pasture"] }
+        {
+          "name": "Problem",
+          "seconds": 6,
+          "voiceover": "Getting your hay and pasture to bounce back quickly between cuttings really comes down to what's happening at the root.",
+          "brollQuery": "green pasture field rolling hills",
+          "caption": "FASTER REGROWTH"
+        },
+        {
+          "name": "Product",
+          "seconds": 6,
+          "voiceover": "Nature's Way Soil Hay, Pasture and Lawn Fertilizer is an organic liquid blend of worm castings, kelp, humic acid, yucca, and beneficial microbes, with advanced filtration for clean, clog-free spraying.",
+          "brollQuery": "liquid fertilizer jug farm field",
+          "caption": "ORGANIC LIQUID BLEND",
+          "useProductImage": true
+        },
+        {
+          "name": "Application",
+          "seconds": 6,
+          "voiceover": "Run it through your boom sprayer for even coverage across the field, and it goes to work at the root level to help speed up forage regrowth.",
+          "brollQuery": "boom sprayer tractor field",
+          "caption": "EVEN BOOM-SPRAYER COVERAGE"
+        },
+        {
+          "name": "Livestock safe",
+          "seconds": 6,
+          "voiceover": "It's safe for horses, cattle, and all livestock, with no harsh chemicals and no withdrawal period. Apply it, and let your animals graze the same day.",
+          "brollQuery": "cattle grazing green pasture",
+          "caption": "GRAZE THE SAME DAY"
+        },
+        {
+          "name": "CTA",
+          "seconds": 5,
+          "voiceover": "Feed your pasture, your hay ground, and your lawn with one organic formula. See the Hay, Pasture and Lawn Fertilizer at Nature's Way Soil.",
+          "brollQuery": "hay field sunset farm",
+          "caption": "NATURE'S WAY SOIL",
+          "useProductImage": true
+        }
       ]
     },
-    "NWS_018": {
-      "audience": "homeowners wanting greener turf and better root-zone support",
-      "angle": "seaweed extract plus humic acid for turf and soil support",
-      "tone": "clean lawn-care educator, premium but simple, clear CTA, no overpromising",
-      "cta": "See the lawn treatment details at Nature's Way Soil.",
+    "NWS_027": {
+      "audience": "gardeners and growers with sandy, depleted, or poor-holding soil",
+      "angle": "activated biochar that helps soil hold water and nutrients and feeds soil life",
+      "tone": "warm, curious, helpful gardening neighbor",
+      "cta": "See the Liquid Biochar Soil Conditioner at Nature's Way Soil.",
       "hooks": [
-        "Greener turf starts with the root zone, not just the leaf blade.",
-        "Seaweed and humic acid are a simple way to support tired lawn soil.",
-        "If your lawn looks hungry, the soil may need help moving nutrients."
+        "Sandy or worn-out soil that just won't hold water? Biochar can help.",
+        "Think of it like a microscopic sponge for your soil.",
+        "Healthy soil starts with healthy biology. Here's how to feed it."
       ],
       "scenes": [
-        { "name": "lawn problem", "seconds": 7, "voiceover": "If your lawn looks patchy or is not responding to regular fertilizer, the root zone may not be moving nutrients effectively.", "brollQueries": ["patchy lawn close up", "dry lawn grass close up", "home lawn problem"] },
-        { "name": "ingredients", "seconds": 8, "voiceover": "Nature's Way Soil Seaweed and Humic Acid Lawn Treatment combines organic seaweed extract and humic acid to support the root zone and nutrient availability.", "brollQueries": ["seaweed extract lawn treatment", "liquid kelp fertilizer bottle", "humic acid soil close up"] },
-        { "name": "application", "seconds": 8, "voiceover": "Apply with a hose-end sprayer or diluted watering can as directed on the label for your lawn size.", "brollQueries": ["watering green lawn", "spraying lawn with hose", "lawn care application"] },
-        { "name": "result and CTA", "seconds": 7, "voiceover": "For full use directions and product details, visit Nature's Way Soil at natureswaysoil.com.", "brollQueries": ["lush green lawn close up", "healthy lawn sunset", "green grass roots close up"] }
+        {
+          "name": "Problem",
+          "seconds": 6,
+          "voiceover": "If your soil dries out fast or just feels worn out, it's probably struggling to hold onto water and nutrients.",
+          "brollQuery": "dry cracked sandy soil",
+          "caption": "SOIL WON'T HOLD WATER?"
+        },
+        {
+          "name": "Product",
+          "seconds": 6,
+          "voiceover": "Nature's Way Soil Liquid Biochar is a concentrated soil conditioner, activated biochar with humic acid, fulvic acid, and kelp.",
+          "brollQuery": "hand holding biochar jug garden",
+          "caption": "ACTIVATED LIQUID BIOCHAR",
+          "useProductImage": true
+        },
+        {
+          "name": "How it works",
+          "seconds": 6,
+          "voiceover": "The biochar works like a microscopic sponge, helping your soil hold water and nutrients instead of letting them leach away, especially in sandy or depleted ground.",
+          "brollQuery": "rich dark garden soil hands",
+          "caption": "LIKE A SOIL SPONGE"
+        },
+        {
+          "name": "Versatile",
+          "seconds": 6,
+          "voiceover": "It also helps feed the beneficial life in your soil, and one concentrate handles a lot, a soil drench, compost tea booster, transplant solution, or all-around conditioner.",
+          "brollQuery": "watering garden bed plants",
+          "caption": "ONE BOTTLE, MANY USES"
+        },
+        {
+          "name": "CTA",
+          "seconds": 5,
+          "voiceover": "Build your soil from the ground up. See Liquid Biochar at Nature's Way Soil.",
+          "brollQuery": "healthy plant roots soil",
+          "caption": "NATURE'S WAY SOIL",
+          "useProductImage": true
+        }
+      ]
+    },
+    "NWS_028": {
+      "audience": "backyard orchardists and anyone growing apple, peach, pear, citrus and other fruit trees",
+      "angle": "root-zone feeding with biochar for blooms, fruit set, and tree vigor; one bottle makes 64 gallons",
+      "tone": "warm, encouraging, backyard-grower friendly",
+      "cta": "See the Fruit Tree Fertilizer with Liquid Biochar at Nature's Way Soil.",
+      "hooks": [
+        "Want more blooms and better fruit set? Start at the root zone.",
+        "One little bottle makes up to sixty-four gallons of tree food.",
+        "Apple, peach, pear, citrus, give your fruit trees a strong season."
+      ],
+      "scenes": [
+        {
+          "name": "Problem",
+          "seconds": 6,
+          "voiceover": "Strong blooms, good fruit set, and healthy trees all start with what's happening down at the root zone.",
+          "brollQuery": "apple tree orchard fruit",
+          "caption": "STARTS AT THE ROOTS"
+        },
+        {
+          "name": "Product",
+          "seconds": 6,
+          "voiceover": "Nature's Way Soil Fruit Tree Fertilizer with Liquid Biochar is a concentrate made to feed fruit trees while it conditions the soil around them.",
+          "brollQuery": "hand holding fruit tree fertilizer orchard",
+          "caption": "FRUIT TREE + BIOCHAR",
+          "useProductImage": true
+        },
+        {
+          "name": "How it works",
+          "seconds": 6,
+          "voiceover": "The biochar helps hold nutrients right where the roots can use them, so you get better feeding around apple, peach, pear, citrus, and more.",
+          "brollQuery": "peach tree blossoms spring",
+          "caption": "FEEDS THE ROOT ZONE"
+        },
+        {
+          "name": "Value",
+          "seconds": 6,
+          "voiceover": "A single thirty-two ounce bottle makes up to sixty-four gallons, and you can use it from spring green-up through fruit set and even after harvest.",
+          "brollQuery": "orchard rows sunny day",
+          "caption": "MAKES UP TO 64 GALLONS"
+        },
+        {
+          "name": "CTA",
+          "seconds": 5,
+          "voiceover": "Give your orchard a strong, steady season. See the Fruit Tree Fertilizer at Nature's Way Soil.",
+          "brollQuery": "ripe fruit tree branch",
+          "caption": "NATURE'S WAY SOIL",
+          "useProductImage": true
+        }
       ]
     }
   }
