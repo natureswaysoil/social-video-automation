@@ -224,7 +224,7 @@ function pickProduct(products: Product[]) {
   const state = readJson(STATE_PATH, { ...DEFAULT_STATE })
   const preferredId = process.env.NEXT_PRODUCT_PREFERRED_ID?.trim()
   const preferredIndex = preferredId ? products.findIndex((p) => p.id === preferredId) : -1
-  const nextCursor = preferredIndex >= 0 ? preferredIndex : (Number(state.cursor || -1) + 1) % products.length
+  const nextCursor = preferredIndex >= 0 ? preferredIndex : (Number(state.cursor ?? -1) + 1) % products.length
   const product = products[nextCursor]
   const variationCount = Number(process.env.VARIATIONS_PER_PRODUCT || 5)
   const lastVariation = state.variationByProduct?.[product.id]
