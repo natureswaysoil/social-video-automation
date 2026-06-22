@@ -1,0 +1,149 @@
+{
+  "topProducts": [
+    {
+      "id": "NWS_014",
+      "name": "Dog Urine Neutralizer & Lawn Revitalizer - 32 oz",
+      "description": "Naturally dark, enzyme and humic-acid lawn treatment that addresses dog urine damage at the soil level. No green dyes and no instant cosmetic cover-up - it helps the soil and grass recover over time. Pet-safe and lawn-safe when used as directed.",
+      "category": "dog urine lawn repair soil",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_014",
+      "amazonUrl": "https://www.amazon.com/dp/B0FG38YYJ5",
+      "productImagePath": "/images/products/NWS_014/main.jpg",
+      "gtin": "",
+      "price": 29.99,
+      "size": "32 fl oz concentrate",
+      "keywords": [
+        "dog urine neutralizer",
+        "lawn revitalizer",
+        "dog spot repair",
+        "enzyme lawn treatment",
+        "pet safe lawn",
+        "humic acid"
+      ],
+      "brollQueries": [
+        "dog sitting on green lawn backyard",
+        "brown grass spot lawn damage",
+        "happy dog running green grass",
+        "healthy green lawn close up",
+        "watering lawn garden hose",
+        "golden retriever backyard grass"
+      ]
+    },
+    {
+      "id": "NWS_026",
+      "name": "Lawn & Soil Recovery System - 1 Gallon",
+      "description": "One gallon liquid concentrate of humic acid, fulvic acid, and organic kelp. Works as a natural soil conditioner that improves soil structure, supports nutrient availability, and encourages stronger root growth for lawns, gardens, and pastures.",
+      "category": "lawn soil recovery humic fulvic kelp",
+      "websiteUrl": "https://www.natureswaysoil.com/product/lawn-soil-recovery-system",
+      "amazonUrl": "https://www.amazon.com/dp/B0F9V3K9L7",
+      "productImagePath": "/images/products/NWS_026/main.jpg",
+      "gtin": "",
+      "price": 44.99,
+      "size": "1 gallon concentrate",
+      "keywords": [
+        "lawn recovery",
+        "soil conditioner",
+        "humic acid",
+        "fulvic acid",
+        "liquid kelp",
+        "yellow grass",
+        "root growth"
+      ],
+      "brollQueries": [
+        "yellow patchy lawn grass",
+        "lush green lawn close up",
+        "grass roots soil cross section",
+        "pouring liquid fertilizer watering can",
+        "healthy garden soil hands",
+        "green backyard lawn sunny"
+      ]
+    },
+    {
+      "id": "NWS_021",
+      "name": "Hay, Pasture & Lawn Fertilizer - 2.5 Gallon",
+      "description": "Organic liquid fertilizer with worm castings, kelp, humic acid, yucca, and beneficial microbes, upgraded with advanced filtration for clean, clog-free spraying. Works at the root level to support faster forage regrowth. Safe for horses, cattle, and all livestock with no withdrawal period.",
+      "category": "hay pasture lawn fertilizer livestock safe",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_021",
+      "amazonUrl": "https://www.amazon.com/dp/B0DFV4YZ61",
+      "productImagePath": "/images/products/NWS_021/main.jpg",
+      "gtin": "00860015921628",
+      "price": 99.99,
+      "size": "2.5 gallon concentrate",
+      "keywords": [
+        "hay fertilizer",
+        "pasture fertilizer",
+        "livestock safe",
+        "forage regrowth",
+        "worm castings",
+        "organic liquid fertilizer",
+        "boom sprayer"
+      ],
+      "brollQueries": [
+        "green pasture field rolling hills",
+        "round hay bales field",
+        "cattle grazing green pasture",
+        "boom sprayer tractor field",
+        "horses grazing pasture",
+        "hay field sunset farm"
+      ]
+    },
+    {
+      "id": "NWS_027",
+      "name": "Liquid Biochar Soil Conditioner - 1 Gallon",
+      "description": "Concentrated soil conditioner built around activated 5-micron biochar with humic acid, fulvic acid, and kelp. Helps soil hold water and nutrients like a microscopic sponge, supports beneficial soil life, and works as a soil drench, compost tea booster, transplant solution, or all-around conditioner.",
+      "category": "liquid biochar soil conditioner humic fulvic kelp",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_027",
+      "amazonUrl": "https://www.amazon.com/dp/B0F8XYZBIO",
+      "productImagePath": "/images/products/NWS_027/main.jpg",
+      "gtin": "",
+      "price": 89.99,
+      "size": "1 gallon concentrate",
+      "keywords": [
+        "liquid biochar",
+        "soil conditioner",
+        "water retention",
+        "humic acid",
+        "fulvic acid",
+        "kelp",
+        "sandy soil",
+        "compost tea"
+      ],
+      "brollQueries": [
+        "dry cracked sandy soil",
+        "rich dark garden soil hands",
+        "biochar charcoal soil close up",
+        "watering garden bed",
+        "plant roots soil growth",
+        "compost pile garden"
+      ]
+    },
+    {
+      "id": "NWS_028",
+      "name": "Fruit Tree Fertilizer with Liquid Biochar - 32 oz",
+      "description": "Concentrated liquid fruit tree feed with liquid biochar that supports blooms, fruit set, and stronger roots while conditioning the soil. Biochar helps hold nutrients in the root zone for apple, peach, pear, citrus, and more. A 32 oz bottle makes up to 64 gallons.",
+      "category": "fruit tree fertilizer liquid biochar orchard",
+      "websiteUrl": "https://www.natureswaysoil.com/product/NWS_028",
+      "amazonUrl": "https://www.amazon.com/dp/B0GTBZ7N56",
+      "productImagePath": "/images/products/NWS_028/main.jpg",
+      "gtin": "",
+      "price": 29.99,
+      "size": "32 oz concentrate (makes up to 64 gallons)",
+      "keywords": [
+        "fruit tree fertilizer",
+        "liquid biochar",
+        "orchard feed",
+        "bloom booster",
+        "fruit set",
+        "apple peach pear citrus",
+        "root zone"
+      ],
+      "brollQueries": [
+        "apple tree orchard fruit",
+        "peach tree blossoms spring",
+        "citrus tree fruit close up",
+        "orchard rows sunny",
+        "watering fruit tree base",
+        "ripe fruit tree branch"
+      ]
+    }
+  ]
+}
