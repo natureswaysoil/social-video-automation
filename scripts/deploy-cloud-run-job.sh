@@ -90,6 +90,11 @@ gcloud run jobs add-iam-policy-binding "$JOB_NAME" \
   --member="serviceAccount:${SCHEDULER_SA}" \
   --role="roles/run.invoker" >/dev/null || true
 
+gcloud run jobs add-iam-policy-binding "$JOB_NAME" \
+  --region="$REGION" --project="$PROJECT_ID" \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/run.invoker" >/dev/null || true
+
 RUN_URI="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/${JOB_NAME}:run"
 
 printf '\nCreating/updating Cloud Scheduler job: %s\n' "$SCHEDULER_NAME"
