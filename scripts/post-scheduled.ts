@@ -14,7 +14,7 @@ import { downloadProductImage, productOverlayText } from './lib/product-assets'
 import { ensureDir, safeFileName } from './lib/video-utils'
 import { createNarration } from './lib/video-provider'
 import { formatCaption } from './lib/caption-formatter'
-import { postToTikTok, fetchBasicMetrics } from './lib/social-platforms'
+import { postToTikTok, postToTwitter, fetchBasicMetrics } from './lib/social-platforms'
 import { postToFacebookGroups } from './lib/facebook-groups'
 import { recordPerformance } from './lib/marketing-engine'
 
@@ -95,6 +95,10 @@ const SECRET_NAMES = [
   'FACEBOOK_GROUPS_ACCESS_TOKEN',
   'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_OPEN_ID',
+  'TWITTER_API_KEY',
+  'TWITTER_API_SECRET',
+  'TWITTER_ACCESS_TOKEN',
+  'TWITTER_ACCESS_SECRET',
   'GCS_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_BUCKET',
   'VIDEO_PUBLIC_URL_BASE'
@@ -589,6 +593,7 @@ async function main() {
     instagram: formatCaption(product, scenePlan, 'instagram'),
     facebook: formatCaption(product, scenePlan, 'facebook'),
     tiktok: formatCaption(product, scenePlan, 'tiktok'),
+    twitter: formatCaption(product, scenePlan, 'tiktok'),
     facebookGroups: formatCaption(product, scenePlan, 'facebook_groups')
   }
   if (String(process.env.DRY_RUN_LOG_ONLY || '').toLowerCase() === 'true') {
@@ -676,6 +681,20 @@ async function main() {
       platformSuccess.tiktok = false
       platformErrors.tiktok = String(error?.message || error)
       log('TikTok post failed', error?.message || error)
+    }
+  }
+  if (platforms.includes('twitter')) {
+    try {
+      const result = await postToTwitter(publicVideoUrl, captions.twitter)
+      const skipped = !!(result as any)?.skipped
+      if (!skipped) posted++
+      platformSuccess.twitter = !skipped
+      if (skipped) platformErrors.twitter = 'Twitter posting skipped'
+      log('Posted to Twitter', result)
+    } catch (error: any) {
+      platformSuccess.twitter = false
+      platformErrors.twitter = String(error?.message || error)
+      log('Twitter post failed', error?.message || error)
     }
   }
   if (platforms.includes('facebook_groups')) {
