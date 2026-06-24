@@ -1,6 +1,6 @@
 import axios from 'axios'
-import crypto from 'crypto'
 import { google } from 'googleapis'
+import { TwitterApi } from 'twitter-api-v2'
 
 function pickEnv(keys: string[]): string {
   for (const key of keys) {
@@ -11,108 +11,55 @@ function pickEnv(keys: string[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// Twitter / X  OAuth 1.0a helper + video posting
-// Secrets: TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
+// Twitter / X video posting via twitter-api-v2 (matches the proven path used
+// in the social-video-automation repo). Accepts a LOCAL file path (preferred)
+// or a public URL (downloaded to a temp file first). OAuth 1.0a user context.
+// Secrets: TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN,
+//          TWITTER_ACCESS_TOKEN_SECRET || TWITTER_ACCESS_SECRET
 // ---------------------------------------------------------------------------
-function twEnc(s: string): string {
-  return encodeURIComponent(s).replace(/[!*'()]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())
-}
-function twOAuthHeader(
-  method: string,
-  url: string,
-  params: Record<string, string>,
-  creds: { apiKey: string; apiSecret: string; token: string; tokenSecret: string }
-): string {
-  const oauth: Record<string, string> = {
-    oauth_consumer_key: creds.apiKey,
-    oauth_nonce: crypto.randomBytes(16).toString('hex'),
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-    oauth_token: creds.token,
-    oauth_version: '1.0',
-  }
-  const allParams: Record<string, string> = { ...oauth, ...params }
-  const paramString = Object.keys(allParams).sort()
-    .map((k) => `${twEnc(k)}=${twEnc(allParams[k])}`).join('&')
-  const baseString = [method.toUpperCase(), twEnc(url.split('?')[0]), twEnc(paramString)].join('&')
-  const signingKey = `${twEnc(creds.apiSecret)}&${twEnc(creds.tokenSecret)}`
-  oauth.oauth_signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64')
-  return 'OAuth ' + Object.keys(oauth).sort().map((k) => `${twEnc(k)}="${twEnc(oauth[k])}"`).join(', ')
-}
-
-export async function postToTwitter(videoUrl: string, caption: string) {
-  const apiKey = process.env.TWITTER_API_KEY
-  const apiSecret = process.env.TWITTER_API_SECRET
-  const token = process.env.TWITTER_ACCESS_TOKEN
-  const tokenSecret = process.env.TWITTER_ACCESS_SECRET
-  if (!apiKey || !apiSecret || !token || !tokenSecret) {
+export async function postToTwitter(videoFileOrUrl: string, caption: string) {
+  const appKey = process.env.TWITTER_API_KEY
+  const appSecret = process.env.TWITTER_API_SECRET
+  const accessToken = process.env.TWITTER_ACCESS_TOKEN
+  const accessSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET || process.env.TWITTER_ACCESS_SECRET
+  if (!appKey || !appSecret || !accessToken || !accessSecret) {
     console.log('Twitter posting skipped: missing TWITTER_API_KEY/API_SECRET/ACCESS_TOKEN/ACCESS_SECRET')
     return { skipped: true }
   }
-  const creds = { apiKey, apiSecret, token, tokenSecret }
-  const uploadUrl = 'https://upload.twitter.com/1.1/media/upload.json'
 
-  // 1. Download MP4 into memory
-  const dl = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 180000 })
-  const videoBuffer = Buffer.from(dl.data)
-  const totalBytes = videoBuffer.length
+  const client = new TwitterApi({ appKey, appSecret, accessToken, accessSecret })
 
-  // 2. INIT
-  const initParams: Record<string, string> = { command: 'INIT', total_bytes: String(totalBytes), media_type: 'video/mp4', media_category: 'tweet_video' }
-  const initRes = await axios.post(uploadUrl, new URLSearchParams(initParams).toString(), {
-    headers: { Authorization: twOAuthHeader('POST', uploadUrl, initParams, creds), 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 60000,
-  })
-  const mediaId = initRes.data?.media_id_string
-  if (!mediaId) throw new Error(`Twitter INIT failed: ${JSON.stringify(initRes.data)}`)
-
-  // 3. APPEND in <=4MB chunks (native FormData/Blob, Node 18+). OAuth signs non-file fields only.
-  const CHUNK = 4 * 1024 * 1024
-  let segment = 0
-  for (let offset = 0; offset < totalBytes; offset += CHUNK) {
-    const chunk = videoBuffer.subarray(offset, Math.min(offset + CHUNK, totalBytes))
-    const appendFields: Record<string, string> = { command: 'APPEND', media_id: mediaId, segment_index: String(segment) }
-    const form = new FormData()
-    form.append('command', 'APPEND')
-    form.append('media_id', mediaId)
-    form.append('segment_index', String(segment))
-    form.append('media', new Blob([chunk]))
-    await axios.post(uploadUrl, form, {
-      headers: { Authorization: twOAuthHeader('POST', uploadUrl, appendFields, creds) },
-      maxBodyLength: Infinity, maxContentLength: Infinity, timeout: 120000,
-    })
-    segment++
+  // Resolve to a local file path; download if a URL was passed.
+  let localPath = videoFileOrUrl
+  let cleanup = false
+  if (/^https?:\/\//i.test(videoFileOrUrl)) {
+    const fs = await import('fs')
+    const os = await import('os')
+    const path = await import('path')
+    const tmp = path.join(os.tmpdir(), `tw-${Date.now()}.mp4`)
+    const resp = await axios.get(videoFileOrUrl, { responseType: 'arraybuffer', timeout: 180000 })
+    fs.writeFileSync(tmp, Buffer.from(resp.data))
+    localPath = tmp
+    cleanup = true
   }
 
-  // 4. FINALIZE
-  const finParams: Record<string, string> = { command: 'FINALIZE', media_id: mediaId }
-  const finRes = await axios.post(uploadUrl, new URLSearchParams(finParams).toString(), {
-    headers: { Authorization: twOAuthHeader('POST', uploadUrl, finParams, creds), 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 60000,
-  })
-
-  // 5. Poll STATUS until processing finishes
-  let info = finRes.data?.processing_info
-  let waited = 0
-  while (info && (info.state === 'pending' || info.state === 'in_progress')) {
-    const secs = Math.max(1, Number(info.check_after_secs || 5))
-    await new Promise((r) => setTimeout(r, secs * 1000))
-    waited += secs
-    const statParams: Record<string, string> = { command: 'STATUS', media_id: mediaId }
-    const statRes = await axios.get(`${uploadUrl}?command=STATUS&media_id=${mediaId}`, {
-      headers: { Authorization: twOAuthHeader('GET', uploadUrl, statParams, creds) }, timeout: 60000,
-    })
-    info = statRes.data?.processing_info
-    if (waited > 300) throw new Error('Twitter media processing timed out')
+  try {
+    // v1.1 chunked uploader first (most reliable for video); fall back to v2.
+    let mediaId: string
+    try {
+      mediaId = await client.v1.uploadMedia(localPath, { mimeType: 'video/mp4', target: 'tweet' })
+    } catch (e: any) {
+      const fsBuf = await import('fs')
+      const buf = fsBuf.readFileSync(localPath)
+      mediaId = await client.v2.uploadMedia(buf, { media_type: 'video/mp4', media_category: 'tweet_video' })
+    }
+    const { data } = await client.v2.tweet({ text: String(caption || '').slice(0, 280), media: { media_ids: [mediaId] } })
+    const tweetId = data?.id
+    if (!tweetId) throw new Error('Twitter did not return a tweet id')
+    return { platform: 'twitter', tweetId, mediaId }
+  } finally {
+    if (cleanup) { try { (await import('fs')).unlinkSync(localPath) } catch {} }
   }
-  if (info && info.state === 'failed') throw new Error(`Twitter media processing failed: ${JSON.stringify(info)}`)
-
-  // 6. Create tweet (v2) with media id
-  const tweetUrl = 'https://api.twitter.com/2/tweets'
-  const tweetRes = await axios.post(tweetUrl, { text: caption.slice(0, 280), media: { media_ids: [mediaId] } }, {
-    headers: { Authorization: twOAuthHeader('POST', tweetUrl, {}, creds), 'Content-Type': 'application/json' }, timeout: 60000,
-  })
-  const tweetId = tweetRes.data?.data?.id
-  if (!tweetId) throw new Error(`Twitter tweet create failed: ${JSON.stringify(tweetRes.data)}`)
-  return { platform: 'twitter', tweetId, mediaId }
 }
 
 export async function postToTikTok(videoUrl: string, caption: string) {
