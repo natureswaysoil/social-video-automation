@@ -685,7 +685,7 @@ async function main() {
   }
   if (platforms.includes('twitter')) {
     try {
-      const result = await postToTwitter(publicVideoUrl, captions.twitter)
+      const result = await postToTwitter(videoFile, captions.twitter)
       const skipped = !!(result as any)?.skipped
       if (!skipped) posted++
       platformSuccess.twitter = !skipped
